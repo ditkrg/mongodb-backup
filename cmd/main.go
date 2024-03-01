@@ -17,6 +17,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := services.CompressDir(backupDir); err != nil {
+		os.Exit(1)
+	}
+
 	if err := services.StartBackupUpload(backupDir); err != nil {
 		os.Exit(1)
 	}
