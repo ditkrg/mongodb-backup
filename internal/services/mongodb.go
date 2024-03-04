@@ -12,23 +12,42 @@ import (
 )
 
 func StartDatabaseDump(backupOutDir string) error {
+	log.Info().Msg("Starting database dump")
+
+	// #############################
+	// get environment variables
+	// #############################
+	mongodbUsername := common.GetRequiredEnv(common.MONGODB__USERNAME)
+	mongodbPassword := common.GetRequiredEnv(common.MONGODB__PASSWORD)
+	mongodbAuthMechanism := common.GetRequiredEnv(common.MONGODB__MECHANISM)
+	mongodbAuthSource := common.GetRequiredEnv(common.MONGODB__AUTH_SOURCE)
+
+	mongodbDatabaseToBackup := common.GetRequiredEnv(common.MONGODB__DB_TO_BACKUP)
+
+	mongodbReplicaSet := common.GetRequiredEnv(common.MONGODB__REPLICA_SET)
+	mongodbHosts := common.GetRequiredEnv(common.MONGODB__HOSTS)
+
+	sslEnabled := common.GetBoolEnv(common.MONGODB__USE_SSL, true)
+
+	// #############################
+	// create a new mongodump instance
+	// #############################
 	dump := mongodump.MongoDump{
 		ToolOptions: &options.ToolOptions{
 			URI: &options.URI{},
 			SSL: &options.SSL{},
 			Auth: &options.Auth{
-				Username:  common.GetRequiredEnv(common.MONGODB__USERNAME),
-				Password:  common.GetRequiredEnv(common.MONGODB__PASSWORD),
-				Mechanism: common.GetRequiredEnv(common.MONGODB__MECHANISM),
-				Source:    common.GetRequiredEnv(common.MONGODB__AUTH_SOURCE),
+				Username:  mongodbUsername,
+				Password:  mongodbPassword,
+				Mechanism: mongodbAuthMechanism,
+				Source:    mongodbAuthSource,
 			},
 			Namespace: &options.Namespace{
-				DB: common.GetRequiredEnv(common.MONGODB__DB_TO_BACKUP),
+				DB: mongodbDatabaseToBackup,
 			},
 			Connection: &options.Connection{
-				Host: fmt.Sprintf("%s/%s", common.GetRequiredEnv(common.MONGODB__REPLICA_SET), common.GetRequiredEnv(common.MONGODB__HOSTS)),
+				Host: fmt.Sprintf("%s/%s", mongodbReplicaSet, mongodbHosts),
 			},
-			// ReplicaSetName: mongodbReplicaSet,
 		},
 		ProgressManager: &ProgressManager{},
 		InputOptions:    &mongodump.InputOptions{},
@@ -40,8 +59,6 @@ func StartDatabaseDump(backupOutDir string) error {
 			DumpDBUsersAndRoles:    false,
 		},
 	}
-
-	sslEnabled := common.GetBoolEnv(common.MONGODB__USE_SSL, true)
 
 	if sslEnabled {
 		dump.ToolOptions.SSL.UseSSL = true
@@ -62,20 +79,31 @@ func StartDatabaseDump(backupOutDir string) error {
 		dump.OutputOptions.ExcludedCollectionPrefixes = excludedCollectionPrefixesArray
 	}
 
+	// #############################
+	// validate options
+	// #############################
 	if err := dump.ValidateOptions(); err != nil {
 		log.Err(err).Msg("Error validating options")
 		return err
 	}
 
+	// #############################
+	// initialize the dump
+	// #############################
 	if err := dump.Init(); err != nil {
 		log.Err(err).Msg("Error initializing database dump")
 		return err
 	}
 
+	// #############################
+	// dump the database
+	// #############################
 	if err := dump.Dump(); err != nil {
 		log.Err(err).Msg("Error dumping database")
 		return err
 	}
+
+	log.Info().Msg("Database dump completed successfully")
 
 	return nil
 }
