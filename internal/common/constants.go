@@ -27,5 +27,5 @@ const (
 )
 
 const (
-	BACKUP_DEFAULT_DIR = "/backup"
+	BACKUP_DEFAULT_DIR = "/app/backup"
 )

@@ -86,39 +86,42 @@ func StartBackupUpload(backupDir string, fileName string) error {
 		return resp.Contents[i].LastModified.After(*resp.Contents[j].LastModified)
 	})
 
-	objectsToDelete := make([]types.ObjectIdentifier, len(resp.Contents)-keepResentN)
+	backupsN := len(resp.Contents)
+	if backupsN > keepResentN {
+		objectsToDelete := make([]types.ObjectIdentifier, backupsN-keepResentN)
 
-	for i, obj := range resp.Contents[keepResentN:] {
-		objectsToDelete[i] = types.ObjectIdentifier{
-			Key: obj.Key,
-		}
-	}
-
-	deleteObjectsOutput, err := s3Client.DeleteObjects(context, &s3.DeleteObjectsInput{
-		Bucket: aws.String(s3Bucket),
-		Delete: &types.Delete{
-			Objects: objectsToDelete,
-		},
-	})
-
-	if err != nil {
-		log.Err(err).Msg("Failed to delete old backups from S3")
-		return err
-	}
-
-	if len(deleteObjectsOutput.Deleted) != len(objectsToDelete) {
-		err := fmt.Errorf("failed to delete all old backups from S3")
-		log.Err(err).Send()
-		return err
-	}
-
-	if deleteObjectsOutput.Errors != nil {
-		for _, err := range deleteObjectsOutput.Errors {
-			s3Err := fmt.Errorf("error deleting object, code :%s, Key: %s, message :%s", *err.Code, *err.Key, *err.Message)
-			log.Err(s3Err).Send()
+		for i, obj := range resp.Contents[keepResentN:] {
+			objectsToDelete[i] = types.ObjectIdentifier{
+				Key: obj.Key,
+			}
 		}
 
-		return fmt.Errorf("failed to delete old backups from S3")
+		deleteObjectsOutput, err := s3Client.DeleteObjects(context, &s3.DeleteObjectsInput{
+			Bucket: aws.String(s3Bucket),
+			Delete: &types.Delete{
+				Objects: objectsToDelete,
+			},
+		})
+		if err != nil {
+			log.Err(err).Msg("Failed to delete old backups from S3")
+			return err
+		}
+
+		if len(deleteObjectsOutput.Deleted) != len(objectsToDelete) {
+			err := fmt.Errorf("failed to delete all old backups from S3")
+			log.Err(err).Send()
+			return err
+		}
+
+		if deleteObjectsOutput.Errors != nil {
+			for _, err := range deleteObjectsOutput.Errors {
+				s3Err := fmt.Errorf("error deleting object, code :%s, Key: %s, message :%s", *err.Code, *err.Key, *err.Message)
+				log.Err(s3Err).Send()
+			}
+
+			return fmt.Errorf("failed to delete old backups from S3")
+		}
+
 	}
 
 	log.Info().Msg("Uploaded backup to S3")
