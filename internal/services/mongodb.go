@@ -65,7 +65,7 @@ func StartDatabaseDump(backupOutDir string) error {
 		dump.ToolOptions.SSL.SSLCAFile = common.GetRequiredEnv(common.MONGODB__TLS_CA_CERT_PATH)
 	}
 
-	if mongodbBackupCollection := common.GetEnv(common.MONGODB__COLLECTIONS_TO_BACKUP); mongodbBackupCollection != "" {
+	if mongodbBackupCollection := common.GetEnv(common.MONGODB__COLLECTION_TO_BACKUP); mongodbBackupCollection != "" {
 		dump.ToolOptions.Namespace.Collection = mongodbBackupCollection
 	}
 
