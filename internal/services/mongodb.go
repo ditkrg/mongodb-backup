@@ -74,7 +74,7 @@ func StartDatabaseDump(backupOutDir string) error {
 		dump.OutputOptions.ExcludedCollections = excludedCollectionsArray
 	}
 
-	if excludedCollectionPrefixes := common.GetEnv(common.MONGODB__EXCLUDED_COLLECTIONS); excludedCollectionPrefixes != "" {
+	if excludedCollectionPrefixes := common.GetEnv(common.MONGODB__EXCLUDED_COLLECTION_PREFIXES); excludedCollectionPrefixes != "" {
 		excludedCollectionPrefixesArray := strings.Split(excludedCollectionPrefixes, ",")
 		dump.OutputOptions.ExcludedCollectionPrefixes = excludedCollectionPrefixesArray
 	}
