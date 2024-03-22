@@ -1,0 +1,20 @@
+name: Build Image
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+
+
+concurrency: release-${{ github.ref }}
+
+jobs:
+  build:
+    uses: ditkrg/build-image-workflow/.github/workflows/workflow.yaml@v1
+    with:
+      image: common/mongodb-backup
+    secrets:
+      username: ${{ secrets.HARBOR_USER }}
+      password: ${{ secrets.HARBOR_TOKEN }}
