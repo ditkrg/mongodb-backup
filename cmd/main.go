@@ -68,6 +68,6 @@ func checkEnvVariables() {
 	common.GetRequiredEnv(common.MONGODB__REPLICA_SET)
 	common.GetRequiredEnv(common.MONGODB__HOSTS)
 
-	common.GetIntEnv(common.S3__KEEP_RESENT_N, 10)
+	common.GetIntEnv(common.S3__KEEP_RECENT_N, 10)
 	common.GetBoolEnv(common.MONGODB__USE_SSL, true)
 }

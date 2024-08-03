@@ -21,7 +21,7 @@ const (
 	S3__ENDPOINT          = "S3__ENDPOINT"
 	S3__ACCESS_KEY        = "S3__ACCESS_KEY"
 	S3__SECRET_ACCESS_KEY = "S3__SECRET_ACCESS_KEY"
-	S3__KEEP_RESENT_N     = "S3__KEEP_RESENT_N"
+	S3__KEEP_RECENT_N     = "S3__KEEP_RESENT_N"
 	S3__BUCKET            = "S3__BUCKET"
 	S3__JOB_DIR           = "S3__JOB_DIR"
 )

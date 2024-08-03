@@ -24,7 +24,7 @@ func StartBackupUpload(backupDir string, fileName string) error {
 	s3AccessKey := common.GetRequiredEnv(common.S3__ACCESS_KEY)
 	s3SecretAccessKey := common.GetRequiredEnv(common.S3__SECRET_ACCESS_KEY)
 	s3Endpoint := common.GetRequiredEnv(common.S3__ENDPOINT)
-	keepResentN := common.GetIntEnv(common.S3__KEEP_RESENT_N, 10)
+	keepResentN := common.GetIntEnv(common.S3__KEEP_RECENT_N, 10)
 	s3Bucket := common.GetRequiredEnv(common.S3__BUCKET)
 	jobDir := common.GetRequiredEnv(common.S3__JOB_DIR)
 	context := context.TODO()
