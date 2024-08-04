@@ -16,17 +16,17 @@ func CompressDir(dir string, fileName string) error {
 	// #############################
 	// create a zip file
 	// #############################
-	zipBackupPath := fmt.Sprintf("%s/%s", dir, fileName)
+	compressedFilePath := fmt.Sprintf("%s/%s", dir, fileName)
 
-	file, err := os.Create(zipBackupPath)
+	file, err := os.Create(compressedFilePath)
 	if err != nil {
-		log.Err(err).Msg("Failed to create a zip file")
+		log.Err(err).Msg("Failed to create a compress file")
 		return err
 	}
 
 	defer func() {
 		if err := file.Close(); err != nil {
-			log.Err(err).Msg("Failed to close the zip file")
+			log.Err(err).Msg("Failed to close the compress file")
 		}
 	}()
 
@@ -36,7 +36,7 @@ func CompressDir(dir string, fileName string) error {
 	w := zip.NewWriter(file)
 	defer func() {
 		if err := w.Close(); err != nil {
-			log.Err(err).Msg("Failed to close the zip file writer")
+			log.Err(err).Msg("Failed to close the file writer")
 		}
 	}()
 
@@ -55,7 +55,7 @@ func CompressDir(dir string, fileName string) error {
 		// #############################
 		// skip the backup zip file and ignore directories
 		// #############################
-		if info.IsDir() || zipBackupPath == path {
+		if info.IsDir() || compressedFilePath == path {
 			return nil
 		}
 
