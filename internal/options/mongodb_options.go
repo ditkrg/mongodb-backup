@@ -2,6 +2,8 @@ package options
 
 import (
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/ditkrg/mongodb-backup/internal/helpers"
 
@@ -13,9 +15,9 @@ type MongoDBOptions struct {
 	ConnectionString           string    `env:"CONNECTION_STRING,required"`
 	DatabaseToBackup           string    `env:"DB_TO_BACKUP,required"`
 	BackupOutDir               string    `env:"BACKUP_OUT_DIR,default=/backup"`
-	Gzip                       bool      `env:"GZIP,default=false"`
+	Gzip                       bool      `env:"GZIP,default=true"`
 	OpLog                      bool      `env:"OPLOG,default=false"`
-	DumpDBUsersAndRoles        bool      `env:"DUMP_DB_USERS_AND_ROLES,default=false"`
+	DumpDBUsersAndRoles        bool      `env:"DUMP_DB_USERS_AND_ROLES,default=true"`
 	SkipUsersAndRoles          bool      `env:"SKIP_USERS_AND_ROLES,default=false"`
 	CollectionToBackup         string    `env:"COLLECTION_TO_BACKUP"`
 	ExcludedCollections        []string  `env:"EXCLUDED_COLLECTIONS"`
@@ -24,7 +26,8 @@ type MongoDBOptions struct {
 	NumParallelCollections     int       `env:"NUM_PARALLEL_COLLECTIONS,default=0"`
 	Verbosity                  Verbosity `env:",prefix=VERBOSITY__"`
 
-	MongoDumpOptions *mongodump.MongoDump
+	MongoDumpOptions  *mongodump.MongoDump
+	BackupOutFilePath string
 }
 
 type Verbosity struct {
@@ -33,6 +36,8 @@ type Verbosity struct {
 }
 
 func (o *MongoDBOptions) PrepareMongoDumpOptions() {
+
+	o.BackupOutFilePath = fmt.Sprintf("%s_%s.gzip", "dump", time.Now().Format("060102-150405"))
 
 	toolOptions := options.New("mongodb-backup", "", "", "", false, options.EnabledOptions{
 		Auth:       true,
@@ -51,8 +56,8 @@ func (o *MongoDBOptions) PrepareMongoDumpOptions() {
 	}
 
 	outputOptions := &mongodump.OutputOptions{
+		Archive:                    o.BackupOutFilePath,
 		NumParallelCollections:     o.NumParallelCollections,
-		Out:                        o.BackupOutDir,
 		Gzip:                       o.Gzip,
 		DumpDBUsersAndRoles:        o.DumpDBUsersAndRoles,
 		ExcludedCollections:        o.ExcludedCollections,

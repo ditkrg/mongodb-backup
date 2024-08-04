@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -32,10 +33,10 @@ func InitS3Service(options options.S3Options) *S3Service {
 	}
 }
 
-func (s3Service *S3Service) StartBackupUpload(ctx context.Context, options options.Options, fileName string) error {
+func (s3Service *S3Service) StartBackupUpload(ctx context.Context, options options.Options) error {
 	log.Info().Msg("Uploading the backup to S3")
 
-	file, err := os.Open(fmt.Sprintf("%s/%s", options.MongoDB.BackupOutDir, fileName))
+	file, err := os.Open(options.MongoDB.BackupOutFilePath)
 
 	if err != nil {
 		log.Err(err).Msg("Failed to open backup file")
@@ -48,9 +49,17 @@ func (s3Service *S3Service) StartBackupUpload(ctx context.Context, options optio
 		}
 	}()
 
+	var backupFileName string
+
+	if options.MongoDB.DatabaseToBackup == "" {
+		backupFileName = fmt.Sprintf("%s_%s.gzip", "all_databases", time.Now().Format("060102-150405"))
+	} else {
+		backupFileName = fmt.Sprintf("%s_%s.gzip", options.MongoDB.DatabaseToBackup, time.Now().Format("060102-150405"))
+	}
+
 	_, err = s3Service.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(options.S3.Bucket),
-		Key:    aws.String(fmt.Sprintf("%s/%s", options.S3.Prefix, fileName)),
+		Key:    aws.String(fmt.Sprintf("%s/%s", options.S3.Prefix, backupFileName)),
 		Body:   file,
 	})
 

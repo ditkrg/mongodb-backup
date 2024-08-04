@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"time"
 
 	"github.com/ditkrg/mongodb-backup/internal/options"
 	"github.com/ditkrg/mongodb-backup/internal/services"
@@ -36,23 +34,7 @@ func main() {
 	// ######################
 
 	if err := services.StartDatabaseDump(config.MongoDB); err != nil {
-		os.Exit(1)
-	}
-
-	// ######################
-	// compress backup
-	// ######################
-
-	var backupFileName string
-
-	if config.MongoDB.DatabaseToBackup == "" {
-		backupFileName = fmt.Sprintf("%s_%s.zip", "all_databases", time.Now().Format("060102-150405"))
-	} else {
-		backupFileName = fmt.Sprintf("%s_%s.tar", config.MongoDB.DatabaseToBackup, time.Now().Format("060102-150405"))
-	}
-
-	if err := services.CompressDir(config.MongoDB.BackupOutDir, backupFileName); err != nil {
-		log.Err(err).Msg("Failed to compress backup")
+		log.Err(err).Msg("Failed to dump database")
 		os.Exit(1)
 	}
 
@@ -65,7 +47,8 @@ func main() {
 	// ######################
 	// Upload backup to S3
 	// ######################
-	if err := s3Service.StartBackupUpload(ctx, config, backupFileName); err != nil {
+
+	if err := s3Service.StartBackupUpload(ctx, config); err != nil {
 		log.Err(err).Msg("Failed to upload backup to S3")
 		os.Exit(1)
 	}
