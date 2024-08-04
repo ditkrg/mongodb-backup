@@ -3,6 +3,7 @@ package options
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ditkrg/mongodb-backup/internal/helpers"
@@ -36,8 +37,9 @@ type Verbosity struct {
 }
 
 func (o *MongoDBOptions) PrepareMongoDumpOptions() {
+	o.BackupOutDir, _ = strings.CutSuffix(o.BackupOutDir, "/")
 
-	o.BackupOutFilePath = fmt.Sprintf("%s_%s.gzip", "dump", time.Now().Format("060102-150405"))
+	o.BackupOutFilePath = fmt.Sprintf("%s/archive_dump_%s.gzip", o.BackupOutDir, time.Now().Format("060102-150405"))
 
 	toolOptions := options.New("mongodb-backup", "", "", "", false, options.EnabledOptions{
 		Auth:       true,

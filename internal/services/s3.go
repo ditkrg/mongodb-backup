@@ -52,9 +52,9 @@ func (s3Service *S3Service) StartBackupUpload(ctx context.Context, options optio
 	var backupFileName string
 
 	if options.MongoDB.DatabaseToBackup == "" {
-		backupFileName = fmt.Sprintf("%s_%s.gzip", "all_databases", time.Now().Format("060102-150405"))
+		backupFileName = fmt.Sprintf("archive_%s_%s.gzip", "all_databases", time.Now().Format("060102-150405"))
 	} else {
-		backupFileName = fmt.Sprintf("%s_%s.gzip", options.MongoDB.DatabaseToBackup, time.Now().Format("060102-150405"))
+		backupFileName = fmt.Sprintf("archive_%s_%s.gzip", options.MongoDB.DatabaseToBackup, time.Now().Format("060102-150405"))
 	}
 
 	_, err = s3Service.PutObject(ctx, &s3.PutObjectInput{
