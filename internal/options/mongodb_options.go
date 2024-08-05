@@ -24,7 +24,7 @@ type MongoDBOptions struct {
 	ExcludedCollections        []string  `env:"EXCLUDED_COLLECTIONS"`
 	ExcludedCollectionPrefixes []string  `env:"EXCLUDED_COLLECTION_PREFIXES"`
 	Query                      string    `env:"QUERY"`
-	NumParallelCollections     int       `env:"NUM_PARALLEL_COLLECTIONS,default=0"`
+	NumParallelCollections     int       `env:"NUM_PARALLEL_COLLECTIONS,default=1"`
 	Verbosity                  Verbosity `env:",prefix=VERBOSITY__"`
 
 	MongoDumpOptions  *mongodump.MongoDump
