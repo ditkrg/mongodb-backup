@@ -14,7 +14,7 @@ import (
 
 type MongoDBOptions struct {
 	ConnectionString           string    `env:"CONNECTION_STRING,required"`
-	DatabaseToBackup           string    `env:"DB_TO_BACKUP,required"`
+	DatabaseToBackup           string    `env:"DB_TO_BACKUP"`
 	BackupOutDir               string    `env:"BACKUP_OUT_DIR,default=/backup"`
 	Gzip                       bool      `env:"GZIP,default=true"`
 	OpLog                      bool      `env:"OPLOG,default=false"`
