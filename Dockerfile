@@ -7,7 +7,7 @@ RUN go mod download
 
 COPY . ./
 
-RUN go build -tags=nomsgpack -v -o server cmd/main.go
+RUN go build -tags=nomsgpack -v -o server main.go
 
 FROM reg.dev.krd/hub.docker/library/debian:stable-slim
 
