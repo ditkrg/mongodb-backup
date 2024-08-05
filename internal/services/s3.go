@@ -57,11 +57,18 @@ func (s3Service *S3Service) StartBackupUpload(ctx context.Context, options optio
 		backupFileName = fmt.Sprintf("archive_%s_%s.gzip", options.MongoDB.DatabaseToBackup, time.Now().Format("060102-150405"))
 	}
 
-	_, err = s3Service.PutObject(ctx, &s3.PutObjectInput{
+	putObject := &s3.PutObjectInput{
 		Bucket: aws.String(options.S3.Bucket),
-		Key:    aws.String(fmt.Sprintf("%s/%s", options.S3.Prefix, backupFileName)),
 		Body:   file,
-	})
+	}
+
+	if options.S3.Prefix == "" {
+		putObject.Key = aws.String(backupFileName)
+	} else {
+		putObject.Key = aws.String(fmt.Sprintf("%s/%s", options.S3.Prefix, backupFileName))
+	}
+
+	_, err = s3Service.PutObject(ctx, putObject)
 
 	if err != nil {
 		log.Err(err).Msg("Failed to upload backup to S3")
@@ -76,10 +83,15 @@ func (s3Service *S3Service) StartBackupUpload(ctx context.Context, options optio
 func (s3Service *S3Service) KeepMostRecentN(ctx context.Context, options options.Options) error {
 	log.Info().Msgf("Keep Latest %d backups", options.S3.KeepRecentN)
 
-	resp, err := s3Service.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+	listObject := &s3.ListObjectsV2Input{
 		Bucket: aws.String(options.S3.Bucket),
-		Prefix: aws.String(fmt.Sprintf("%s/", options.S3.Prefix)),
-	})
+	}
+
+	if options.S3.Prefix != "" {
+		listObject.Prefix = aws.String(options.S3.Prefix)
+	}
+
+	resp, err := s3Service.ListObjectsV2(ctx, listObject)
 
 	if err != nil {
 		log.Err(err).Msg("Failed to list objects in S3 bucket")
