@@ -27,8 +27,7 @@ type MongoDBOptions struct {
 	NumParallelCollections     int       `env:"NUM_PARALLEL_COLLECTIONS,default=1"`
 	Verbosity                  Verbosity `env:",prefix=VERBOSITY__"`
 
-	MongoDumpOptions  *mongodump.MongoDump
-	BackupOutFilePath string
+	MongoDumpOptions *mongodump.MongoDump
 }
 
 type Verbosity struct {
@@ -39,33 +38,30 @@ type Verbosity struct {
 func (o *MongoDBOptions) PrepareMongoDumpOptions() {
 	o.BackupOutDir, _ = strings.CutSuffix(o.BackupOutDir, "/")
 
-	o.BackupOutFilePath = fmt.Sprintf("%s/archive_dump_%s.gzip", o.BackupOutDir, time.Now().Format("060102-150405"))
-
-	toolOptions := options.New("mongodb-backup", "", "", "", false, options.EnabledOptions{
-		Auth:       true,
-		Connection: false,
-		Namespace:  false,
-		URI:        false,
-	})
-
-	toolOptions.ConnectionString = o.ConnectionString
-	toolOptions.Verbosity = &options.Verbosity{Quiet: o.Verbosity.Quiet, VLevel: o.Verbosity.Level}
-	toolOptions.Namespace = &options.Namespace{DB: o.DatabaseToBackup, Collection: o.CollectionToBackup}
-	toolOptions.NormalizeOptionsAndURI()
-
-	inputOptions := &mongodump.InputOptions{
-		Query: o.Query,
-	}
+	inputOptions := &mongodump.InputOptions{Query: o.Query}
 
 	outputOptions := &mongodump.OutputOptions{
-		Archive:                    o.BackupOutFilePath,
+		Archive:                    fmt.Sprintf("%s/archive_dump_%s.gzip", o.BackupOutDir, time.Now().Format("060102-150405")),
 		NumParallelCollections:     o.NumParallelCollections,
 		Gzip:                       o.Gzip,
 		DumpDBUsersAndRoles:        o.DumpDBUsersAndRoles,
 		ExcludedCollections:        o.ExcludedCollections,
 		ExcludedCollectionPrefixes: o.ExcludedCollectionPrefixes,
-		Oplog:                      o.OpLog,
 	}
+
+	toolOptions := options.New("mongodb-backup", "", "", "", false, options.EnabledOptions{Auth: true})
+	toolOptions.ConnectionString = o.ConnectionString
+	toolOptions.Verbosity = &options.Verbosity{Quiet: o.Verbosity.Quiet, VLevel: o.Verbosity.Level}
+	toolOptions.Namespace = &options.Namespace{DB: o.DatabaseToBackup, Collection: o.CollectionToBackup}
+
+	if o.OpLog {
+		outputOptions.Archive = ""
+		outputOptions.Out = o.BackupOutDir
+		outputOptions.DumpDBUsersAndRoles = false
+		toolOptions.Namespace = &options.Namespace{DB: "local", Collection: "oplog.rs"}
+	}
+
+	toolOptions.NormalizeOptionsAndURI()
 
 	o.MongoDumpOptions = &mongodump.MongoDump{
 		SkipUsersAndRoles: o.SkipUsersAndRoles,

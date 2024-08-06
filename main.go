@@ -2,66 +2,88 @@ package main
 
 import (
 	"context"
-	"os"
+	"time"
 
+	"github.com/ditkrg/mongodb-backup/internal/models"
 	"github.com/ditkrg/mongodb-backup/internal/options"
 	"github.com/ditkrg/mongodb-backup/internal/services"
-	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
-	"github.com/sethvargo/go-envconfig"
 )
 
 func main() {
-	// ######################
-	// Load env variables
-	// ######################
-	godotenv.Load()
+	config := options.LoadConfig()
 
-	var config options.Options
-
-	if err := envconfig.Process(context.Background(), &config); err != nil {
-		log.Fatal().Err(err).Msg("Failed to process environment variables")
+	if config.MongoDB.OpLog {
+		startOplogBackup(config)
+	} else {
+		startBackup(config)
 	}
+}
 
-	config.MongoDB.PrepareMongoDumpOptions()
-
-	if err := config.Validate(); err != nil {
-		log.Fatal().Err(err).Msg("Invalid configuration")
-	}
-
+func startBackup(config *options.Options) {
 	// ######################
 	// dump database
 	// ######################
-
-	if err := services.StartDatabaseDump(config.MongoDB); err != nil {
-		log.Err(err).Msg("Failed to dump database")
-		os.Exit(1)
-	}
+	services.StartDatabaseDump(config.MongoDB)
 
 	// ######################
 	// Prepare S3 Service
 	// ######################
 	ctx := context.Background()
-	s3Service := services.InitS3Service(config.S3)
+	s3Service := services.NewS3Service(config.S3)
 
 	// ######################
 	// Upload backup to S3
 	// ######################
-
-	if err := s3Service.StartBackupUpload(ctx, config); err != nil {
-		log.Err(err).Msg("Failed to upload backup to S3")
-		os.Exit(1)
-	}
+	s3Service.StartBackupUpload(ctx, config)
 
 	//  ######################
 	//  Keep the latest N backups
 	//  ######################
 	if config.S3.KeepRecentN > 0 {
-		if err := s3Service.KeepMostRecentN(ctx, config); err != nil {
-			log.Err(err).Msg("Failed to keep the latest N backups")
-			os.Exit(1)
-		}
+		s3Service.KeepMostRecentN(ctx, config)
 	}
 
 	log.Info().Msg("Backup completed successfully")
+}
+
+func startOplogBackup(config *options.Options) {
+	// ######################
+	// Prepare S3 Service
+	// ######################
+	ctx := context.Background()
+	s3Service := services.NewS3Service(config.S3)
+
+	// ######################
+	// Check if a backup Exists
+	// ######################
+	if exists := s3Service.CheckBackupExists(ctx, config); !exists {
+		return
+	}
+
+	// ######################
+	// Get the latest oplog config
+	// ######################
+	oplogConfig := s3Service.GetOplogConfig(ctx, config)
+
+	// ######################
+	// dump oplog
+	// ######################
+	startTime := time.Now().Unix()
+	services.StartOplogDump(config.MongoDB, oplogConfig)
+
+	// ######################
+	// Upload oplog to S3
+	// ######################
+	s3Service.StartOplogBackup(ctx, config)
+
+	// ######################
+	// Update the latest oplog config
+	// ######################
+	s3Service.UpdateOplogConfig(ctx, config, &models.OplogConfig{LastJobTime: startTime})
+
+	// ######################
+	// Keep Relative oplog backups
+	// ######################
+	s3Service.KeepRelativeOplogBackups(ctx, config)
 }
