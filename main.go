@@ -75,12 +75,12 @@ func startOplogBackup(config *options.Options) {
 	// ######################
 	// Upload oplog to S3
 	// ######################
-	s3Service.StartOplogBackup(ctx, config)
+	s3Service.UploadOplog(ctx, config)
 
 	// ######################
 	// Update the latest oplog config
 	// ######################
-	s3Service.UpdateOplogConfig(ctx, config, &models.OplogConfig{LastJobTime: startTime})
+	s3Service.UploadOplogConfig(ctx, config, &models.OplogConfig{LastJobTime: startTime})
 
 	// ######################
 	// Keep Relative oplog backups

@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/ditkrg/mongodb-backup/internal/helpers"
 	"github.com/ditkrg/mongodb-backup/internal/models"
 	"github.com/ditkrg/mongodb-backup/internal/options"
 	"github.com/rs/zerolog/log"
@@ -95,29 +96,7 @@ func (s3Service *S3Service) KeepMostRecentN(ctx context.Context, options *option
 			}
 		}
 
-		deleteObjectsOutput, err := s3Service.DeleteObjects(ctx, &s3.DeleteObjectsInput{
-			Bucket: aws.String(options.S3.Bucket),
-			Delete: &types.Delete{
-				Objects: objectsToDelete,
-			},
-		})
-
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to delete old backups from S3")
-		}
-
-		if len(deleteObjectsOutput.Deleted) != len(objectsToDelete) {
-			err := fmt.Errorf("failed to delete all old backups from S3")
-			log.Fatal().Err(err).Msg("Failed to delete old backups from S3")
-		}
-
-		if deleteObjectsOutput.Errors != nil {
-			for _, err := range deleteObjectsOutput.Errors {
-				s3Err := fmt.Errorf("error deleting object, code :%s, Key: %s, message :%s", *err.Code, *err.Key, *err.Message)
-				log.Fatal().Err(s3Err).Msg("Failed to delete old backups from S3")
-			}
-		}
-
+		s3Service.deleteObjects(ctx, options.S3.Bucket, objectsToDelete)
 	}
 
 	log.Info().Msg("Removed old backups from S3")
@@ -156,7 +135,7 @@ func (s3Service *S3Service) GetOplogConfig(ctx context.Context, options *options
 	return &oplogConfig
 }
 
-func (s3Service *S3Service) UpdateOplogConfig(ctx context.Context, options *options.Options, oplogConfig *models.OplogConfig) {
+func (s3Service *S3Service) UploadOplogConfig(ctx context.Context, options *options.Options, oplogConfig *models.OplogConfig) {
 	oplogConfigArray, err := json.Marshal(oplogConfig)
 
 	if err != nil {
@@ -174,7 +153,7 @@ func (s3Service *S3Service) UpdateOplogConfig(ctx context.Context, options *opti
 	}
 }
 
-func (s3Service *S3Service) StartOplogBackup(ctx context.Context, options *options.Options) {
+func (s3Service *S3Service) UploadOplog(ctx context.Context, options *options.Options) {
 	log.Info().Msg("Uploading the oplog to S3")
 
 	s3Dir := options.S3.CreateNewOplogBackupDir()
@@ -249,18 +228,80 @@ func (s3Service *S3Service) CheckBackupExists(ctx context.Context, options *opti
 func (s3Service *S3Service) KeepRelativeOplogBackups(ctx context.Context, options *options.Options) {
 	log.Info().Msg("Keep Relative Oplog Backups")
 
-	listObject := &s3.ListObjectsV2Input{
-		Bucket: aws.String(options.S3.Bucket),
-		Prefix: aws.String(options.S3.GetParentOplogBackupDir()),
-	}
+	var err error
+	var backupResponse *s3.ListObjectsV2Output
+	var oplogResponse *s3.ListObjectsV2Output
 
-	resp, err := s3Service.ListObjectsV2(ctx, listObject)
+	// ######################
+	// Get the oldest backup
+	// ######################
+	backupResponse, err = s3Service.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket: aws.String(options.S3.Bucket),
+		Prefix: aws.String(options.S3.GetBackupDirPath("")),
+	})
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to list objects in S3 bucket")
 	}
 
-	backupsN := len(resp.Contents)
+	sort.Slice(backupResponse.Contents, func(i, j int) bool {
+		return backupResponse.Contents[i].LastModified.Before(*backupResponse.Contents[j].LastModified)
+	})
 
-	print("backupsN: ", backupsN)
+	oldestBackup := backupResponse.Contents[0].LastModified
+
+	// ######################
+	// Get all oplog backups older than the oldest backup
+	// ######################
+	oplogResponse, err = s3Service.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket: aws.String(options.S3.Bucket),
+		Prefix: aws.String(options.S3.GetParentOplogBackupDir()),
+	})
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to list objects in S3 bucket")
+	}
+
+	objectsToDelete := make([]types.ObjectIdentifier, 0)
+
+	for _, obj := range oplogResponse.Contents {
+
+		if obj.LastModified.Before(*oldestBackup) && obj.Key != aws.String(helpers.ConfigFileName) {
+			objectsToDelete = append(objectsToDelete, types.ObjectIdentifier{Key: obj.Key})
+		}
+	}
+
+	s3Service.deleteObjects(ctx, options.S3.Bucket, objectsToDelete)
+
+	log.Info().Msg("Removed old oplog backups from S3")
+}
+
+func (s3Service *S3Service) deleteObjects(ctx context.Context, bucket string, objectsToDelete []types.ObjectIdentifier) {
+
+	if len(objectsToDelete) == 0 {
+		return
+	}
+
+	deleteObjectsOutput, err := s3Service.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+		Bucket: aws.String(bucket),
+		Delete: &types.Delete{
+			Objects: objectsToDelete,
+		},
+	})
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to delete object from S3")
+	}
+
+	if len(deleteObjectsOutput.Deleted) != len(objectsToDelete) {
+		err := fmt.Errorf("failed to delete all object from S3")
+		log.Fatal().Err(err).Msg("Failed to delete object from S3")
+	}
+
+	if deleteObjectsOutput.Errors != nil {
+		for _, err := range deleteObjectsOutput.Errors {
+			s3Err := fmt.Errorf("error deleting object, code :%s, Key: %s, message :%s", *err.Code, *err.Key, *err.Message)
+			log.Fatal().Err(s3Err).Msg("Failed to delete object from S3")
+		}
+	}
 }
