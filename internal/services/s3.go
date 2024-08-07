@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
@@ -43,23 +43,12 @@ func NewS3Service(options options.S3Options) *S3Service {
 func (s3Service *S3Service) StartBackupUpload(ctx context.Context, options *options.Options) {
 	log.Info().Msg("Uploading the backup to S3")
 
-	file, err := os.Open(options.MongoDB.MongoDumpOptions.OutputOptions.Archive)
-
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to open backup file")
-	}
-
-	defer file.Close()
-
-	_, err = s3Service.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(options.S3.Bucket),
-		Body:   file,
-		Key:    aws.String(options.S3.GetBackupFilePath(options.MongoDB.DatabaseToBackup)),
-	})
-
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to upload backup to S3")
-	}
+	s3Service.uploadFile(
+		ctx,
+		options.S3.Bucket,
+		options.S3.BackupFilePath(options.MongoDB.DatabaseToBackup),
+		options.MongoDB.MongoDumpOptions.OutputOptions.Archive,
+	)
 
 	log.Info().Msg("Uploaded backup to S3")
 }
@@ -67,15 +56,10 @@ func (s3Service *S3Service) StartBackupUpload(ctx context.Context, options *opti
 func (s3Service *S3Service) KeepMostRecentN(ctx context.Context, options *options.Options) {
 	log.Info().Msgf("Keep Latest %d backups", options.S3.KeepRecentN)
 
-	listObject := &s3.ListObjectsV2Input{
+	resp, err := s3Service.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(options.S3.Bucket),
-	}
-
-	if options.S3.Prefix != "" {
-		listObject.Prefix = aws.String(options.S3.GetBackupDirPath(options.MongoDB.DatabaseToBackup))
-	}
-
-	resp, err := s3Service.ListObjectsV2(ctx, listObject)
+		Prefix: aws.String(options.S3.BackupDirPath(options.MongoDB.DatabaseToBackup)),
+	})
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to list objects in S3 bucket")
@@ -105,19 +89,21 @@ func (s3Service *S3Service) KeepMostRecentN(ctx context.Context, options *option
 func (s3Service *S3Service) GetOplogConfig(ctx context.Context, options *options.Options) *models.OplogConfig {
 	log.Info().Msg("Getting the latest oplog config")
 
+	key := fmt.Sprintf("%s/%s", options.S3.OplogDir(), helpers.ConfigFileName)
+
 	resp, err := s3Service.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(options.S3.Bucket),
-		Key:    aws.String(options.S3.GetOplogConfigFilePath()),
+		Key:    aws.String(key),
 	})
 
 	if err != nil {
-		var re *awshttp.ResponseError
+		var responseError *awshttp.ResponseError
 
-		if ok := errors.As(err, &re); !ok {
+		if ok := errors.As(err, &responseError); !ok {
 			log.Fatal().Err(err).Msg("Failed to get config file from S3")
 		}
 
-		if re.ResponseError.HTTPStatusCode() == http.StatusNotFound {
+		if responseError.ResponseError.HTTPStatusCode() == http.StatusNotFound {
 			return nil
 		}
 
@@ -125,8 +111,8 @@ func (s3Service *S3Service) GetOplogConfig(ctx context.Context, options *options
 	}
 
 	defer resp.Body.Close()
-	var oplogConfig models.OplogConfig
 
+	var oplogConfig models.OplogConfig
 	if err := json.NewDecoder(resp.Body).Decode(&oplogConfig); err != nil {
 		log.Fatal().Err(err).Msg("Failed to decode the config file")
 	}
@@ -144,7 +130,7 @@ func (s3Service *S3Service) UploadOplogConfig(ctx context.Context, options *opti
 
 	_, err = s3Service.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(options.S3.Bucket),
-		Key:    aws.String(options.S3.GetOplogConfigFilePath()),
+		Key:    aws.String(fmt.Sprintf("%s/%s", options.S3.OplogDir(), helpers.ConfigFileName)),
 		Body:   strings.NewReader(string(oplogConfigArray)),
 	})
 
@@ -156,60 +142,30 @@ func (s3Service *S3Service) UploadOplogConfig(ctx context.Context, options *opti
 func (s3Service *S3Service) UploadOplog(ctx context.Context, options *options.Options) {
 	log.Info().Msg("Uploading the oplog to S3")
 
-	s3Dir := options.S3.CreateNewOplogBackupDir()
+	fileName := fmt.Sprintf("%s.tar.gz", time.Now().Format("060102-150405"))
+	dirToTar := options.MongoDB.BackupOutDir + "/local"
 
-	err := filepath.Walk(options.MongoDB.BackupOutDir+"/local", func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			return s3Service.uploadOplogFile(ctx, options, s3Dir, path)
-		}
-		return nil
-	})
+	helpers.TarDirectory(dirToTar, fileName)
 
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to upload oplog to S3")
-	}
+	s3Service.uploadFile(
+		ctx,
+		options.S3.Bucket,
+		fmt.Sprintf("%s/%s", options.S3.OplogDir(), fileName),
+		fmt.Sprintf("%s/%s", dirToTar, fileName),
+	)
+
+	os.Remove(fmt.Sprintf("%s/%s", dirToTar, fileName))
 
 	log.Info().Msg("Uploaded oplog to S3")
 }
 
-func (s3Service *S3Service) uploadOplogFile(ctx context.Context, options *options.Options, s3Dir string, filePath string) error {
-	file, err := os.Open(filePath)
+func (s3Service *S3Service) ObjectExistsAt(ctx context.Context, bucket string, prefix string) bool {
 
-	if err != nil {
-		return err
-	}
-
-	defer file.Close()
-
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return err
-	}
-
-	_, err = s3Service.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(options.S3.Bucket),
-		Body:   file,
-		Key:    aws.String(fmt.Sprintf("%s/%s", s3Dir, fileInfo.Name())),
-	})
-
-	if err != nil {
-		return err
-	}
-
-	log.Info().Msgf("Uploaded %s to S3", fileInfo.Name())
-
-	return nil
-}
-
-func (s3Service *S3Service) CheckBackupExists(ctx context.Context, options *options.Options) bool {
-	log.Info().Msgf("Checking if a backup exists")
+	log.Info().Msgf("Checking if objects exists in %s/%s", bucket, prefix)
 
 	resp, err := s3Service.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-		Bucket: aws.String(options.S3.Bucket),
-		Prefix: aws.String(options.S3.GetBackupDirPath("")),
+		Bucket: aws.String(bucket),
+		Prefix: aws.String(prefix),
 	})
 
 	if err != nil {
@@ -217,11 +173,12 @@ func (s3Service *S3Service) CheckBackupExists(ctx context.Context, options *opti
 	}
 
 	if len(resp.Contents) == 0 {
-		log.Info().Msg("No backup exists. there must be a backup before starting the oplog backup")
+		log.Info().Msgf("No objects found in %s/%s", bucket, prefix)
 		return false
 	}
 
-	log.Info().Msgf("Found %d backups in %s", len(resp.Contents), options.S3.Bucket)
+	log.Info().Msgf("Found %d objects in %s", len(resp.Contents), bucket)
+
 	return true
 }
 
@@ -237,7 +194,7 @@ func (s3Service *S3Service) KeepRelativeOplogBackups(ctx context.Context, option
 	// ######################
 	backupResponse, err = s3Service.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(options.S3.Bucket),
-		Prefix: aws.String(options.S3.GetBackupDirPath("")),
+		Prefix: aws.String(options.S3.BackupDirPath("")),
 	})
 
 	if err != nil {
@@ -255,7 +212,7 @@ func (s3Service *S3Service) KeepRelativeOplogBackups(ctx context.Context, option
 	// ######################
 	oplogResponse, err = s3Service.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(options.S3.Bucket),
-		Prefix: aws.String(options.S3.GetParentOplogBackupDir()),
+		Prefix: aws.String(options.S3.OplogDir()),
 	})
 
 	if err != nil {
@@ -264,9 +221,10 @@ func (s3Service *S3Service) KeepRelativeOplogBackups(ctx context.Context, option
 
 	objectsToDelete := make([]types.ObjectIdentifier, 0)
 
+	oplogFileKey := aws.String(fmt.Sprintf("%s/%s", options.S3.OplogDir(), helpers.ConfigFileName))
 	for _, obj := range oplogResponse.Contents {
 
-		if obj.LastModified.Before(*oldestBackup) && obj.Key != aws.String(helpers.ConfigFileName) {
+		if obj.LastModified.Before(*oldestBackup) && obj.Key != oplogFileKey {
 			objectsToDelete = append(objectsToDelete, types.ObjectIdentifier{Key: obj.Key})
 		}
 	}
@@ -274,6 +232,35 @@ func (s3Service *S3Service) KeepRelativeOplogBackups(ctx context.Context, option
 	s3Service.deleteObjects(ctx, options.S3.Bucket, objectsToDelete)
 
 	log.Info().Msg("Removed old oplog backups from S3")
+}
+
+func (s3Service *S3Service) uploadFile(ctx context.Context, bucket string, key string, filePath string) error {
+	file, err := os.Open(filePath)
+
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return err
+	}
+
+	_, err = s3Service.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(bucket),
+		Body:   file,
+		Key:    aws.String(key),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	log.Info().Msgf("Uploaded %s to S3", fileInfo.Name())
+
+	return nil
 }
 
 func (s3Service *S3Service) deleteObjects(ctx context.Context, bucket string, objectsToDelete []types.ObjectIdentifier) {

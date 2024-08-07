@@ -57,7 +57,8 @@ func startOplogBackup(config *options.Options) {
 	// ######################
 	// Check if a backup Exists
 	// ######################
-	if exists := s3Service.CheckBackupExists(ctx, config); !exists {
+	if exists := s3Service.ObjectExistsAt(ctx, config.S3.Bucket, config.S3.BackupDirPath("")); !exists {
+		log.Error().Msgf("no backups found in %s/%s, there must be a full backup before oplog backup", config.S3.Bucket, config.S3.BackupDirPath(""))
 		return
 	}
 

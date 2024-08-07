@@ -3,8 +3,6 @@ package options
 import (
 	"fmt"
 	"time"
-
-	"github.com/ditkrg/mongodb-backup/internal/helpers"
 )
 
 type S3Options struct {
@@ -16,7 +14,7 @@ type S3Options struct {
 	KeepRecentN int    `env:"KEEP_RECENT_N,default=5"`
 }
 
-func (options S3Options) GetOplogConfigDir() string {
+func (options S3Options) OplogDir() string {
 	if options.Prefix == "" {
 		return "oplog"
 	} else {
@@ -24,37 +22,13 @@ func (options S3Options) GetOplogConfigDir() string {
 	}
 }
 
-func (options S3Options) CreateNewOplogBackupDir() string {
-	timeNow := time.Now().Format("060102-150405")
-	parentDir := options.GetParentOplogBackupDir()
-	return fmt.Sprintf("%s/%s", parentDir, timeNow)
-}
-
-func (options S3Options) GetParentOplogBackupDir() string {
-	if options.Prefix == "" {
-		return "oplog"
-	} else {
-		return fmt.Sprintf("%s/oplog", options.Prefix)
-	}
-}
-
-func (options S3Options) GetOplogConfigFilePath() string {
-	fileDir := options.GetOplogConfigDir()
-
-	if options.Prefix == "" {
-		return fmt.Sprintf("%s/%s", fileDir, helpers.ConfigFileName)
-	} else {
-		return fmt.Sprintf("%s/%s", fileDir, helpers.ConfigFileName)
-	}
-}
-
-func (options S3Options) GetBackupDirPath(databaseName string) string {
+func (options S3Options) BackupDirPath(databaseName string) string {
 	var dirPath string
 
 	if databaseName == "" {
 		dirPath = "full_backups"
 	} else {
-		dirPath = fmt.Sprintf("%s_backups", databaseName)
+		dirPath = fmt.Sprintf("%s_database_backups", databaseName)
 	}
 
 	if options.Prefix == "" {
@@ -64,13 +38,8 @@ func (options S3Options) GetBackupDirPath(databaseName string) string {
 	}
 }
 
-func (options S3Options) GetBackupFilePath(databaseName string) string {
+func (options S3Options) BackupFilePath(databaseName string) string {
 	timeNow := time.Now().Format("060102-150405")
-	fileDir := options.GetBackupDirPath(databaseName)
-
-	if databaseName == "" {
-		return fmt.Sprintf("%s/archive_%s.gzip", fileDir, timeNow)
-	} else {
-		return fmt.Sprintf("%s/archive_%s.gzip", fileDir, timeNow)
-	}
+	fileDir := options.BackupDirPath(databaseName)
+	return fmt.Sprintf("%s/archive_%s.gzip", fileDir, timeNow)
 }
