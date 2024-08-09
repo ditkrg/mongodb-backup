@@ -78,4 +78,6 @@ func TarDirectory(sourceDirPath string, fileName string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to archive the directory")
 	}
+
+	log.Info().Msgf("Directory %s archived to %s", sourceDirPath, outputFile)
 }

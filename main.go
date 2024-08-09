@@ -11,80 +11,80 @@ import (
 )
 
 func main() {
-	config := options.LoadConfig()
-
-	if config.MongoDB.OpLog {
-		startOplogBackup(config)
+	options.LoadConfig()
+	if options.Config.MongoDB.OpLog {
+		startOplogBackup()
 	} else {
-		startBackup(config)
+		startBackup()
 	}
 }
 
-func startBackup(config *options.Options) {
+func startBackup() {
 	// ######################
 	// dump database
 	// ######################
-	services.StartDatabaseDump(config.MongoDB)
+	services.StartDatabaseDump()
 
 	// ######################
 	// Prepare S3 Service
 	// ######################
 	ctx := context.Background()
-	s3Service := services.NewS3Service(config.S3)
+	s3Service := services.NewS3Service()
 
 	// ######################
 	// Upload backup to S3
 	// ######################
-	s3Service.StartBackupUpload(ctx, config)
+	s3Service.UploadBackup(ctx)
 
 	//  ######################
 	//  Keep the latest N backups
 	//  ######################
-	if config.S3.KeepRecentN > 0 {
-		s3Service.KeepMostRecentN(ctx, config)
+	if options.Config.S3.KeepRecentN > 0 {
+		s3Service.KeepRecentBackups(ctx)
 	}
 
 	log.Info().Msg("Backup completed successfully")
 }
 
-func startOplogBackup(config *options.Options) {
+func startOplogBackup() {
 	// ######################
 	// Prepare S3 Service
 	// ######################
 	ctx := context.Background()
-	s3Service := services.NewS3Service(config.S3)
+	s3Service := services.NewS3Service()
 
 	// ######################
 	// Check if a backup Exists
 	// ######################
-	if exists := s3Service.ObjectExistsAt(ctx, config.S3.Bucket, config.S3.BackupDirPath("")); !exists {
-		log.Error().Msgf("no backups found in %s/%s, there must be a full backup before oplog backup", config.S3.Bucket, config.S3.BackupDirPath(""))
+	backUpDir := options.Config.S3.BackupDirPath("")
+	if exists := s3Service.ExistsAt(ctx, options.Config.S3.Bucket, backUpDir); !exists {
+		log.Error().Msgf("no backups found in %s/%s, there must be a full backup before oplog backup", options.Config.S3.Bucket, backUpDir)
 		return
 	}
 
 	// ######################
 	// Get the latest oplog config
 	// ######################
-	oplogConfig := s3Service.GetOplogConfig(ctx, config)
+	oplogConfig := s3Service.GetOplogConfig(ctx)
 
 	// ######################
 	// dump oplog
 	// ######################
 	startTime := time.Now().Unix()
-	services.StartOplogDump(config.MongoDB, oplogConfig)
+	services.StartOplogDump(oplogConfig)
 
 	// ######################
 	// Upload oplog to S3
 	// ######################
-	s3Service.UploadOplog(ctx, config)
+	s3Service.UploadOplog(ctx)
 
 	// ######################
 	// Update the latest oplog config
 	// ######################
-	s3Service.UploadOplogConfig(ctx, config, &models.OplogConfig{LastJobTime: startTime})
+	s3Service.UploadOplogConfig(ctx, &models.OplogConfig{LastJobTime: startTime})
 
 	// ######################
 	// Keep Relative oplog backups
 	// ######################
-	s3Service.KeepRelativeOplogBackups(ctx, config)
+	s3Service.KeepRelativeOplogBackups(ctx)
 }

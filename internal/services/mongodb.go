@@ -9,32 +9,32 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func StartDatabaseDump(options options.MongoDBOptions) {
+func StartDatabaseDump() {
 	log.Info().Msg("Starting database dump")
 
-	if err := options.MongoDumpOptions.Init(); err != nil {
+	if err := options.Config.MongoDB.MongoDumpOptions.Init(); err != nil {
 		log.Fatal().Err(err).Msg("Error initializing database dump")
 	}
 
-	if err := options.MongoDumpOptions.Dump(); err != nil {
+	if err := options.Config.MongoDB.MongoDumpOptions.Dump(); err != nil {
 		log.Fatal().Err(err).Msg("Error dumping database")
 	}
 
 	log.Info().Msg("Database dump completed successfully")
 }
 
-func StartOplogDump(options options.MongoDBOptions, oplogConfig *models.OplogConfig) {
+func StartOplogDump(oplogConfig *models.OplogConfig) {
 	log.Info().Msg("Starting oplog dump")
 
 	if oplogConfig != nil {
-		options.MongoDumpOptions.InputOptions.Query = fmt.Sprintf(helpers.OplogQuery, oplogConfig.LastJobTime)
+		options.Config.MongoDB.MongoDumpOptions.InputOptions.Query = fmt.Sprintf(helpers.OplogQuery, oplogConfig.LastJobTime)
 	}
 
-	if err := options.MongoDumpOptions.Init(); err != nil {
+	if err := options.Config.MongoDB.MongoDumpOptions.Init(); err != nil {
 		log.Fatal().Err(err).Msg("Error initializing oplog dump")
 	}
 
-	if err := options.MongoDumpOptions.Dump(); err != nil {
+	if err := options.Config.MongoDB.MongoDumpOptions.Dump(); err != nil {
 		log.Fatal().Err(err).Msg("Error dumping oplog")
 	}
 

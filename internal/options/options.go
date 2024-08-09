@@ -2,11 +2,15 @@ package options
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 	"github.com/sethvargo/go-envconfig"
 )
+
+var Config *Options
 
 type Options struct {
 	MongoDB MongoDBOptions `env:",prefix=MONGODB__"`
@@ -21,8 +25,14 @@ func (o *Options) Validate() error {
 	return nil
 }
 
-func LoadConfig() *Options {
-	godotenv.Load()
+func LoadConfig() {
+
+	envFilePath := os.Getenv("ENV_FILE_PATH")
+	if envFilePath == "" {
+		envFilePath = fmt.Sprintf("/home/%s/.mongodbBackup/.env", os.Getenv("USER"))
+	}
+
+	godotenv.Load(envFilePath, ".env")
 
 	var config Options
 
@@ -36,5 +46,5 @@ func LoadConfig() *Options {
 		log.Fatal().Err(err).Msg("Invalid configuration")
 	}
 
-	return &config
+	Config = &config
 }
