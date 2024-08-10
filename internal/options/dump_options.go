@@ -10,23 +10,14 @@ import (
 	"github.com/sethvargo/go-envconfig"
 )
 
-var Config *Options
+var Dump *DumpOptions
 
-type Options struct {
-	MongoDB MongoDBOptions `env:",prefix=MONGODB__"`
-	S3      S3Options      `env:",prefix=S3__"`
+type DumpOptions struct {
+	MongoDump MongoDumpOptions `env:",prefix=MONGO_DUMP__"`
+	S3        S3Options        `env:",prefix=S3__"`
 }
 
-func (o *Options) Validate() error {
-	if err := o.MongoDB.Validate(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func LoadConfig() {
-
+func LoadDumpOptions() {
 	envFilePath := os.Getenv("ENV_FILE_PATH")
 	if envFilePath == "" {
 		envFilePath = fmt.Sprintf("/home/%s/.mongodbBackup/.env", os.Getenv("USER"))
@@ -34,17 +25,17 @@ func LoadConfig() {
 
 	godotenv.Load(envFilePath, ".env")
 
-	var config Options
+	var config DumpOptions
 
 	if err := envconfig.Process(context.Background(), &config); err != nil {
 		log.Fatal().Err(err).Msg("Failed to process environment variables")
 	}
 
-	config.MongoDB.PrepareMongoDumpOptions()
+	config.MongoDump.PrepareMongoDumpOptions()
 
-	if err := config.Validate(); err != nil {
+	if err := config.MongoDump.Validate(); err != nil {
 		log.Fatal().Err(err).Msg("Invalid configuration")
 	}
 
-	Config = &config
+	Dump = &config
 }

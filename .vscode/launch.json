@@ -10,6 +10,11 @@
             "request": "launch",
             "mode": "auto",
             "program": "./main.go",
+            "args": [
+                "--full-restore",
+                "--bucket",
+                "mongodb-community-backups-dev"
+            ]
         }
     ]
 }

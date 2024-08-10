@@ -7,10 +7,30 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/ditkrg/mongodb-backup/internal/options"
 	"github.com/rs/zerolog/log"
 )
+
+type S3Service struct {
+	*s3.Client
+}
+
+func NewS3Service(s3Options options.S3Options) *S3Service {
+	config := aws.Config{
+		Credentials: credentials.NewStaticCredentialsProvider(s3Options.AccessKey, s3Options.SecretKey, ""),
+		Region:      "us-east-1",
+	}
+
+	return &S3Service{
+		Client: s3.NewFromConfig(config, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(s3Options.EndPoint)
+			o.UsePathStyle = true
+		}),
+	}
+}
 
 func (s3Service *S3Service) List(ctx context.Context, bucket string, prefix string) *s3.ListObjectsV2Output {
 	log.Info().Msgf("Listing objects in %s/%s", bucket, prefix)

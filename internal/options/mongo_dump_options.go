@@ -12,15 +12,15 @@ import (
 	"github.com/mongodb/mongo-tools/mongodump"
 )
 
-type MongoDBOptions struct {
-	ConnectionString           string    `env:"CONNECTION_STRING,required"`
-	DatabaseToBackup           string    `env:"DB_TO_BACKUP"`
-	BackupOutDir               string    `env:"BACKUP_OUT_DIR,default=/backup"`
+type MongoDumpOptions struct {
+	ConnectionString           string    `env:"CONNECTION_STRING"`
+	Database                   string    `env:"DATABASE"`
+	BackupDir                  string    `env:"BACKUP_DIR,default=/backup"`
 	Gzip                       bool      `env:"GZIP,default=true"`
 	OpLog                      bool      `env:"OPLOG,default=false"`
 	DumpDBUsersAndRoles        bool      `env:"DUMP_DB_USERS_AND_ROLES,default=true"`
 	SkipUsersAndRoles          bool      `env:"SKIP_USERS_AND_ROLES,default=false"`
-	CollectionToBackup         string    `env:"COLLECTION_TO_BACKUP"`
+	Collection                 string    `env:"COLLECTION"`
 	ExcludedCollections        []string  `env:"EXCLUDED_COLLECTIONS"`
 	ExcludedCollectionPrefixes []string  `env:"EXCLUDED_COLLECTION_PREFIXES"`
 	Query                      string    `env:"QUERY"`
@@ -30,18 +30,13 @@ type MongoDBOptions struct {
 	MongoDumpOptions *mongodump.MongoDump
 }
 
-type Verbosity struct {
-	Quiet bool `env:"QUIET,default=false"`
-	Level int  `env:"LEVEL,default=0"`
-}
-
-func (o *MongoDBOptions) PrepareMongoDumpOptions() {
-	o.BackupOutDir, _ = strings.CutSuffix(o.BackupOutDir, "/")
+func (o *MongoDumpOptions) PrepareMongoDumpOptions() {
+	o.BackupDir, _ = strings.CutSuffix(o.BackupDir, "/")
 
 	inputOptions := &mongodump.InputOptions{Query: o.Query}
 
 	outputOptions := &mongodump.OutputOptions{
-		Archive:                    fmt.Sprintf("%s/archive_dump_%s.gzip", o.BackupOutDir, time.Now().Format("060102-150405")),
+		Archive:                    fmt.Sprintf("%s/archive_dump_%s.gzip", o.BackupDir, time.Now().Format("060102-150405")),
 		NumParallelCollections:     o.NumParallelCollections,
 		Gzip:                       o.Gzip,
 		DumpDBUsersAndRoles:        o.DumpDBUsersAndRoles,
@@ -52,11 +47,11 @@ func (o *MongoDBOptions) PrepareMongoDumpOptions() {
 	toolOptions := options.New("mongodb-backup", "", "", "", false, options.EnabledOptions{Auth: true})
 	toolOptions.ConnectionString = o.ConnectionString
 	toolOptions.Verbosity = &options.Verbosity{Quiet: o.Verbosity.Quiet, VLevel: o.Verbosity.Level}
-	toolOptions.Namespace = &options.Namespace{DB: o.DatabaseToBackup, Collection: o.CollectionToBackup}
+	toolOptions.Namespace = &options.Namespace{DB: o.Database, Collection: o.Collection}
 
 	if o.OpLog {
 		outputOptions.Archive = ""
-		outputOptions.Out = o.BackupOutDir
+		outputOptions.Out = o.BackupDir
 		outputOptions.DumpDBUsersAndRoles = false
 		toolOptions.Namespace = &options.Namespace{DB: "local", Collection: "oplog.rs"}
 	}
@@ -72,7 +67,7 @@ func (o *MongoDBOptions) PrepareMongoDumpOptions() {
 	}
 }
 
-func (o *MongoDBOptions) Validate() error {
+func (o *MongoDumpOptions) Validate() error {
 
 	if o.Verbosity.Level < 0 || o.Verbosity.Level > 5 {
 		return errors.New("verbosity level must be between 0 and 5")

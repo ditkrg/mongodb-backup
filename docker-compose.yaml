@@ -1,12 +1,22 @@
 services:
-  mongo:
+  mongodb:
     image: mongo:6.0
+    hostname: mongodb
     restart: always
+    container_name: mongodb
+    ports: [27017:27017]
+    volumes: [./mongodb-keyfile.key:/data/mongodb-keyfile.key]
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin
-    ports:
-      - 27017:27017
+    command:
+      [
+        "--replSet",
+        "dbrs",
+        "--keyFile",
+        "/data/mongodb-keyfile.key"
+      ]
+
 
   minio:
     image: bitnami/minio:2024.8.3-debian-12-r0

@@ -12,8 +12,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/ditkrg/mongodb-backup/internal/helpers"
 	"github.com/ditkrg/mongodb-backup/internal/models"
@@ -21,32 +19,14 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type S3Service struct {
-	*s3.Client
-}
-
-func NewS3Service() *S3Service {
-	config := aws.Config{
-		Credentials: credentials.NewStaticCredentialsProvider(options.Config.S3.AccessKey, options.Config.S3.SecretKey, ""),
-		Region:      "us-east-1",
-	}
-
-	return &S3Service{
-		Client: s3.NewFromConfig(config, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(options.Config.S3.EndPoint)
-			o.UsePathStyle = true
-		}),
-	}
-}
-
 func (s3Service *S3Service) UploadBackup(ctx context.Context) {
 	log.Info().Msg("Uploading the backup to S3")
 
 	s3Service.UploadFile(
 		ctx,
-		options.Config.S3.Bucket,
-		options.Config.S3.BackupFilePath(options.Config.MongoDB.DatabaseToBackup),
-		options.Config.MongoDB.MongoDumpOptions.OutputOptions.Archive,
+		options.Dump.S3.Bucket,
+		options.Dump.S3.BackupFilePath(options.Dump.MongoDump.Database),
+		options.Dump.MongoDump.MongoDumpOptions.OutputOptions.Archive,
 	)
 
 	log.Info().Msg("Uploaded backup to S3")
@@ -57,38 +37,38 @@ func (s3Service *S3Service) KeepRecentBackups(ctx context.Context) {
 
 	resp := s3Service.List(
 		ctx,
-		options.Config.S3.Bucket,
-		options.Config.S3.BackupDirPath(options.Config.MongoDB.DatabaseToBackup),
+		options.Dump.S3.Bucket,
+		options.Dump.S3.BackupDirPath(options.Dump.MongoDump.Database),
 	)
 
 	s3BackupCount := len(resp.Contents)
 
-	log.Info().Msgf("Found %d backups, max backup to keep %d", s3BackupCount, options.Config.S3.KeepRecentN)
+	log.Info().Msgf("Found %d backups, max backup to keep %d", s3BackupCount, options.Dump.S3.KeepRecentN)
 
-	if s3BackupCount > options.Config.S3.KeepRecentN {
-		backupsToDeleteCount := s3BackupCount - options.Config.S3.KeepRecentN
+	if s3BackupCount > options.Dump.S3.KeepRecentN {
+		backupsToDeleteCount := s3BackupCount - options.Dump.S3.KeepRecentN
 		objectsToDelete := make([]types.ObjectIdentifier, backupsToDeleteCount)
 
 		sort.Slice(resp.Contents, func(i, j int) bool {
 			return resp.Contents[i].LastModified.After(*resp.Contents[j].LastModified)
 		})
 
-		for i, obj := range resp.Contents[options.Config.S3.KeepRecentN:] {
+		for i, obj := range resp.Contents[options.Dump.S3.KeepRecentN:] {
 			objectsToDelete[i] = types.ObjectIdentifier{
 				Key: obj.Key,
 			}
 		}
 
-		s3Service.Delete(ctx, options.Config.S3.Bucket, objectsToDelete)
+		s3Service.Delete(ctx, options.Dump.S3.Bucket, objectsToDelete)
 	}
 }
 
 func (s3Service *S3Service) GetOplogConfig(ctx context.Context) *models.OplogConfig {
 	log.Info().Msg("Getting the latest oplog config")
 
-	key := fmt.Sprintf("%s/%s", options.Config.S3.OplogDir(), helpers.ConfigFileName)
+	key := fmt.Sprintf("%s/%s", options.Dump.S3.OplogDir(), helpers.ConfigFileName)
 
-	resp, err := s3Service.Get(ctx, options.Config.S3.Bucket, key)
+	resp, err := s3Service.Get(ctx, options.Dump.S3.Bucket, key)
 
 	if err != nil {
 		var responseError *awshttp.ResponseError
@@ -124,22 +104,22 @@ func (s3Service *S3Service) UploadOplogConfig(ctx context.Context, oplogConfig *
 
 	s3Service.UploadByteArray(
 		ctx,
-		options.Config.S3.Bucket,
-		fmt.Sprintf("%s/%s", options.Config.S3.OplogDir(), helpers.ConfigFileName),
+		options.Dump.S3.Bucket,
+		fmt.Sprintf("%s/%s", options.Dump.S3.OplogDir(), helpers.ConfigFileName),
 		oplogConfigArray,
 	)
 }
 
 func (s3Service *S3Service) UploadOplog(ctx context.Context) {
 	fileName := fmt.Sprintf("%s.tar.gz", time.Now().Format("060102-150405"))
-	dirToTar := options.Config.MongoDB.BackupOutDir + "/local"
+	dirToTar := options.Dump.MongoDump.BackupDir + "/local"
 
 	helpers.TarDirectory(dirToTar, fileName)
 
 	s3Service.UploadFile(
 		ctx,
-		options.Config.S3.Bucket,
-		fmt.Sprintf("%s/%s", options.Config.S3.OplogDir(), fileName),
+		options.Dump.S3.Bucket,
+		fmt.Sprintf("%s/%s", options.Dump.S3.OplogDir(), fileName),
 		fmt.Sprintf("%s/%s", dirToTar, fileName),
 	)
 
@@ -154,8 +134,8 @@ func (s3Service *S3Service) KeepRelativeOplogBackups(ctx context.Context) {
 	// ######################
 	backupResponse := s3Service.List(
 		ctx,
-		options.Config.S3.Bucket,
-		options.Config.S3.BackupDirPath(""),
+		options.Dump.S3.Bucket,
+		options.Dump.S3.BackupDirPath(""),
 	)
 
 	sort.Slice(backupResponse.Contents, func(i, j int) bool {
@@ -168,9 +148,9 @@ func (s3Service *S3Service) KeepRelativeOplogBackups(ctx context.Context) {
 	// Get all oplog backups older than the oldest backup
 	// ######################
 	objectsToDelete := make([]types.ObjectIdentifier, 0)
-	oplogFileKey := aws.String(fmt.Sprintf("%s/%s", options.Config.S3.OplogDir(), helpers.ConfigFileName))
+	oplogFileKey := aws.String(fmt.Sprintf("%s/%s", options.Dump.S3.OplogDir(), helpers.ConfigFileName))
 
-	oplogResponse := s3Service.List(ctx, options.Config.S3.Bucket, options.Config.S3.OplogDir())
+	oplogResponse := s3Service.List(ctx, options.Dump.S3.Bucket, options.Dump.S3.OplogDir())
 
 	for _, obj := range oplogResponse.Contents {
 		if obj.LastModified.Before(*oldestBackup) && obj.Key != oplogFileKey {
@@ -178,5 +158,5 @@ func (s3Service *S3Service) KeepRelativeOplogBackups(ctx context.Context) {
 		}
 	}
 
-	s3Service.Delete(ctx, options.Config.S3.Bucket, objectsToDelete)
+	s3Service.Delete(ctx, options.Dump.S3.Bucket, objectsToDelete)
 }
