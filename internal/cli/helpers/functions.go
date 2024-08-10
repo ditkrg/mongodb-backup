@@ -2,6 +2,8 @@ package helpers
 
 import (
 	"context"
+	"io"
+	"os"
 
 	"github.com/charmbracelet/huh"
 	"github.com/ditkrg/mongodb-backup/internal/services"
@@ -31,4 +33,26 @@ func ChooseDatabaseToRestore(s3Service *services.S3Service, ctx context.Context,
 	}
 
 	return backupToRestore
+}
+
+func WriteToFile(body io.ReadCloser, filePath string) error {
+	defer body.Close()
+
+	log.Info().Msgf("Writing backup to %s", filePath)
+
+	outFile, err := os.Create(filePath)
+
+	if err != nil {
+		log.Err(err).Msg("Failed to create output file")
+		return err
+	}
+
+	defer outFile.Close()
+
+	if _, err := io.Copy(outFile, body); err != nil {
+		log.Err(err).Msg("Failed to write backup to file")
+		return err
+	}
+
+	return nil
 }

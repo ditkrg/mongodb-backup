@@ -15,7 +15,6 @@ func main() {
 		options.LoadDumpOptions()
 		services.StartBackupProcess()
 	} else {
-		options.LoadRestoreOptions()
 		cli.Run()
 	}
 }
