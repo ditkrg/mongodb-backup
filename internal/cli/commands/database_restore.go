@@ -13,8 +13,9 @@ import (
 )
 
 type DatabaseRestore struct {
-	Key         string `optional:"" prefix:"s3-" help:"The key of the backup to restore."`
-	flags.Flags `embed:""`
+	Key   string                  `optional:"" prefix:"s3-" help:"The key of the backup to restore."`
+	S3    flags.S3Flags           `embed:"" prefix:"s3-" envprefix:"S3__" group:"Common S3 Flags:" `
+	Mongo flags.MongoRestoreFlags `embed:"" prefix:"mongo-" envprefix:"MONGO_RESTORE__" group:"Common Mongo Restore Flags:"`
 }
 
 func (restore DatabaseRestore) Run() error {
