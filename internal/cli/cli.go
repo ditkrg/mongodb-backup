@@ -23,7 +23,7 @@ func Run() {
 		envFilePath = fmt.Sprintf("%s/.mongoCli/.env", os.Getenv("HOME"))
 	}
 
-	godotenv.Load(envFilePath, ".env")
+	godotenv.Load(".env", envFilePath)
 
 	cli := &CLI{}
 
