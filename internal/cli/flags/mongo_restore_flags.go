@@ -1,8 +1,6 @@
 package flags
 
 import (
-	"strings"
-
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongorestore"
 	"github.com/rs/zerolog/log"
@@ -43,30 +41,6 @@ func (o *MongoRestoreFlags) PrepareBackupMongoRestoreOptions(filePath string) *m
 		Gzip:                   o.Gzip,
 	}
 
-	mongorestoreOptions := o.getMongoRestoreOptions()
-	mongorestoreOptions.InputOptions = inputOptions
-
-	return mongorestoreOptions
-}
-
-func (o *MongoRestoreFlags) PrepareOplogMongoRestoreOptions() *mongorestore.MongoRestore {
-	o.BackupDir, _ = strings.CutSuffix(o.BackupDir, "/")
-
-	inputOptions := &mongorestore.InputOptions{
-		Directory:              o.BackupDir,
-		RestoreDBUsersAndRoles: o.RestoreDBUsersAndRoles,
-		Objcheck:               o.ObjectCheck,
-		Gzip:                   o.Gzip,
-		OplogLimit:             o.OplogLimit,
-		OplogReplay:            true,
-	}
-
-	mongorestoreOptions := o.getMongoRestoreOptions()
-	mongorestoreOptions.InputOptions = inputOptions
-	return mongorestoreOptions
-}
-
-func (o *MongoRestoreFlags) getMongoRestoreOptions() *mongorestore.MongoRestore {
 	outputOptions := &mongorestore.OutputOptions{
 		Drop:                     o.Drop,
 		DryRun:                   o.DryRun,
@@ -100,6 +74,7 @@ func (o *MongoRestoreFlags) getMongoRestoreOptions() *mongorestore.MongoRestore 
 		OutputOptions:   outputOptions,
 		NSOptions:       nsOptions,
 		TargetDirectory: o.BackupDir,
+		InputOptions:    inputOptions,
 	})
 
 	mongorestoreOptions.SkipUsersAndRoles = o.SkipUsersAndRoles
