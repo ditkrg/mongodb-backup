@@ -11,14 +11,16 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func TarDirectory(sourceDirPath string, fileName string) {
+func TarDirectory(sourceDirPath string, fileName string) error {
 
-	outputFile := fmt.Sprintf("%s/%s", sourceDirPath, fileName)
-	outFile, err := os.Create(outputFile)
+	outputFilePath := fmt.Sprintf("%s/%s", sourceDirPath, fileName)
+	outFile, err := os.Create(outputFilePath)
 
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not create tar.gz file")
+		log.Error().Err(err).Msg("could not create tar.gz file")
+		return err
 	}
+
 	defer outFile.Close()
 
 	tarWriter := tar.NewWriter(outFile)
@@ -31,11 +33,11 @@ func TarDirectory(sourceDirPath string, fileName string) {
 			return err
 		}
 
-		if info.IsDir() || outputFile == path {
+		if info.IsDir() || outputFilePath == path {
 			return nil
 		}
 
-		log.Info().Msgf("Adding %s to %s", path, outputFile)
+		log.Info().Msgf("Adding %s to %s", path, outputFilePath)
 
 		file, err := os.Open(path)
 
@@ -71,13 +73,15 @@ func TarDirectory(sourceDirPath string, fileName string) {
 			return err
 		}
 
-		log.Info().Msgf("File %s added to %s", path, outputFile)
+		log.Info().Msgf("File %s added to %s", path, outputFilePath)
 		return nil
 	})
 
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to archive the directory")
+		log.Error().Err(err).Msg("Failed to archive the directory")
+		return err
 	}
 
-	log.Info().Msgf("Directory %s archived to %s", sourceDirPath, outputFile)
+	log.Info().Msgf("Directory %s archived to %s", sourceDirPath, outputFilePath)
+	return nil
 }
