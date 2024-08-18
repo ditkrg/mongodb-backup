@@ -147,7 +147,8 @@ func startOplogBackup(command *DumpCommand) error {
 
 	if previousOplogRunInfo == nil {
 		previousOplogRunInfo = &models.PreviousOplogRunInfo{OplogTakenFrom: "0", OplogTakenTo: "0"}
-		s3OpLogBackupKey = fmt.Sprintf("%d_%s.tar.gz", 0, startTime)
+		fromTime := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC).Format(helpers.TimeFormat)
+		s3OpLogBackupKey = fmt.Sprintf("%s_%s.tar.gz", fromTime, startTime)
 		log.Info().Msg("Taking a full OpLog backup")
 	} else {
 		s3OpLogBackupKey = fmt.Sprintf("%s_%s.tar.gz", previousOplogRunInfo.OplogTakenTo, startTime)
