@@ -1,5 +1,6 @@
 package models
 
-type OplogConfig struct {
-	LastJobTime int64 `json:"last_job_time"`
+type PreviousOplogRunInfo struct {
+	OplogTakenFrom string `json:"oplog_taken_from"`
+	OplogTakenTo   string `json:"oplog_taken_to"`
 }

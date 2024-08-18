@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
+	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -20,7 +20,6 @@ import (
 	"github.com/ditkrg/mongodb-backup/internal/helpers"
 	"github.com/ditkrg/mongodb-backup/internal/models"
 	"github.com/ditkrg/mongodb-backup/internal/services"
-	"github.com/mongodb/mongo-tools/mongodump"
 	"github.com/rs/zerolog/log"
 )
 
@@ -39,16 +38,20 @@ func (command DumpCommand) Run() error {
 }
 
 func startBackup(command *DumpCommand) error {
-	var err error
-	var mongoDump *mongodump.MongoDump
+	timeNow := time.Now().UTC().Format(helpers.TimeFormat)
 
-	s3FileKey := helpers.S3FileKey(true, command.Mongo.Gzip)
-	s3FileKeyWithPrefix := fmt.Sprintf("%s/%s", helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.Database), s3FileKey)
+	s3FileKey := fmt.Sprintf("%s.archive", timeNow)
+	if command.Mongo.Gzip {
+		s3FileKey = fmt.Sprintf("%s.gzip", timeNow)
+	}
+
+	s3FileKeyWithPrefix := helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.Database) + s3FileKey
 
 	// ######################
 	// Prepare MongoDump
 	// ######################
-	if mongoDump, err = command.Mongo.PrepareMongoDump(); err != nil {
+	mongoDump, err := command.Mongo.PrepareMongoDump()
+	if err != nil {
 		return err
 	}
 
@@ -99,23 +102,7 @@ func startBackup(command *DumpCommand) error {
 }
 
 func startOplogBackup(command *DumpCommand) error {
-	var mongoDump *mongodump.MongoDump
-	var oplogConfig *models.OplogConfig
-	var listResp *s3.ListObjectsV2Output
-	var oplogListResp *s3.ListObjectsV2Output
-	var exists bool
-	var err error
-
-	backupDir, _ := strings.CutSuffix(command.Mongo.BackupDir, "/")
-
-	s3OpLogFileKey := fmt.Sprintf("%s.tar.gz", time.Now().Format("060102-150405"))
-	s3OpLogFilePrefix := helpers.S3OplogPrefix(command.S3.Prefix)
-	s3OpLogFileKeyWithPrefix := fmt.Sprintf("%s/%s", s3OpLogFilePrefix, s3OpLogFileKey)
-
-	s3OplogConfigFileKeyWithPrefix := fmt.Sprintf("%s/%s", helpers.S3OplogPrefix(command.S3.Prefix), helpers.ConfigFileName)
-
-	s3FullBackupPrefix := helpers.S3BackupPrefix(command.S3.Prefix, "")
-	tarFileDir := backupDir + "/local"
+	tarFileDir := strings.TrimSuffix(command.Mongo.BackupDir, "/") + "/local/"
 
 	// ######################
 	// Prepare S3 Service
@@ -126,43 +113,52 @@ func startOplogBackup(command *DumpCommand) error {
 	// ######################
 	// Check if a backup Exists
 	// ######################
-
-	if exists, err = s3Service.ObjectsExistsAt(ctx, command.S3.Bucket, s3FullBackupPrefix); err != nil {
+	exists, err := s3Service.ObjectsExistsAt(ctx, command.S3.Bucket, helpers.S3BackupPrefix(command.S3.Prefix, ""))
+	if err != nil {
 		return err
 	}
 
 	if !exists {
-		log.Info().Msgf("no backups found in %s/%s, there must be a full backup before oplog backup", command.S3.Bucket, s3FullBackupPrefix)
+		log.Info().Msgf("no backups found in %s/%s, there must be a full backup before oplog backup", command.S3.Bucket, helpers.S3BackupPrefix(command.S3.Prefix, ""))
 		return nil
 	}
 
 	// ######################
 	// Get the latest oplog config
 	// ######################
-	if oplogConfig, err = getOplogConfig(ctx, s3Service, command); err != nil {
+	previousOplogRunInfo, err := getPreviousOplogRunData(ctx, s3Service, command)
+	if err != nil {
 		return err
 	}
 
 	// ######################
 	// Prepare MongoDump
 	// ######################
-	if mongoDump, err = command.Mongo.PrepareMongoDump(); err != nil {
+	mongoDump, err := command.Mongo.PrepareMongoDump()
+	if err != nil {
 		return err
+	}
+
+	// ######################
+	// Prepare OpLog Backup Key
+	// ######################
+	startTime := time.Now().UTC().Format(helpers.TimeFormat)
+	var s3OpLogBackupKey string
+
+	if previousOplogRunInfo == nil {
+		previousOplogRunInfo = &models.PreviousOplogRunInfo{OplogTakenFrom: "0", OplogTakenTo: "0"}
+		s3OpLogBackupKey = fmt.Sprintf("%d_%s.tar.gz", 0, startTime)
+		log.Info().Msg("Taking a full OpLog backup")
+	} else {
+		s3OpLogBackupKey = fmt.Sprintf("%s_%s.tar.gz", previousOplogRunInfo.OplogTakenTo, startTime)
+		mongoDump.InputOptions.Query = fmt.Sprintf(helpers.OplogQuery, previousOplogRunInfo.OplogTakenTo, startTime)
+		log.Info().Msgf("Taking OpLog from %s to %s", previousOplogRunInfo.OplogTakenTo, startTime)
 	}
 
 	// ######################
 	// dump oplog
 	// ######################
-	startTime := time.Now().Unix()
-
 	log.Info().Msg("Starting oplog dump")
-
-	if oplogConfig == nil {
-		log.Info().Msg("Taking a full OpLog backup")
-	} else {
-		log.Info().Msgf("Taking OpLog from %d", oplogConfig.LastJobTime)
-		mongoDump.InputOptions.Query = fmt.Sprintf(helpers.OplogQuery, oplogConfig.LastJobTime)
-	}
 
 	if err := mongoDump.Init(); err != nil {
 		log.Error().Err(err).Msg("Error initializing oplog dump")
@@ -177,23 +173,30 @@ func startOplogBackup(command *DumpCommand) error {
 	log.Info().Msg("Oplog dump completed successfully")
 
 	// ######################
+	// Tar Oplog Directory
+	// ######################
+	if err := helpers.TarDirectory(tarFileDir, s3OpLogBackupKey); err != nil {
+		return err
+	}
+
+	// ######################
 	// Upload oplog to S3
 	// ######################
-	helpers.TarDirectory(tarFileDir, s3OpLogFileKey)
-
-	s3Service.UploadFile(
+	if err := s3Service.UploadFile(
 		ctx,
 		command.S3.Bucket,
-		s3OpLogFileKeyWithPrefix,
-		fmt.Sprintf("%s/%s", tarFileDir, s3OpLogFileKey),
-	)
+		helpers.S3OplogPrefix(command.S3.Prefix)+s3OpLogBackupKey,
+		tarFileDir+s3OpLogBackupKey,
+	); err != nil {
+		return err
+	}
 
 	// ######################
 	// Upload a new oplog config
 	// ######################
-	log.Info().Msg("Uploading a new oplog config")
+	log.Info().Msg("Upload the current oplog run info")
 
-	oplogConfigByteArray, err := json.Marshal(&models.OplogConfig{LastJobTime: startTime})
+	oplogConfigByteArray, err := json.Marshal(&models.PreviousOplogRunInfo{OplogTakenFrom: previousOplogRunInfo.OplogTakenTo, OplogTakenTo: startTime})
 
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to marshal oplog config")
@@ -202,7 +205,7 @@ func startOplogBackup(command *DumpCommand) error {
 
 	if _, err := s3Service.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(command.S3.Bucket),
-		Key:    aws.String(s3OplogConfigFileKeyWithPrefix),
+		Key:    aws.String(helpers.S3OplogPrefix(command.S3.Prefix) + helpers.ConfigFileName),
 		Body:   bytes.NewReader(oplogConfigByteArray),
 	}); err != nil {
 		log.Error().Err(err).Msg("Failed to upload content")
@@ -212,38 +215,7 @@ func startOplogBackup(command *DumpCommand) error {
 	// ######################
 	// Keep Relative oplog backups
 	// ######################
-	log.Info().Msg("Keep Relative Oplog Backups")
-
-	if listResp, err = s3Service.List(
-		ctx,
-		command.S3.Bucket,
-		s3FullBackupPrefix,
-	); err != nil {
-		return err
-	}
-
-	sort.Slice(listResp.Contents, func(i, j int) bool {
-		return listResp.Contents[i].LastModified.Before(*listResp.Contents[j].LastModified)
-	})
-
-	oldestBackup := listResp.Contents[0].LastModified
-
-	// ######################
-	// Get all oplog backups older than the oldest backup
-	// ######################
-	objectsToDelete := make([]types.ObjectIdentifier, 0)
-
-	if oplogListResp, err = s3Service.List(ctx, command.S3.Bucket, s3OpLogFilePrefix); err != nil {
-		return err
-	}
-
-	for _, obj := range oplogListResp.Contents {
-		if obj.LastModified.Before(*oldestBackup) && (*obj.Key) != s3OplogConfigFileKeyWithPrefix {
-			objectsToDelete = append(objectsToDelete, types.ObjectIdentifier{Key: obj.Key})
-		}
-	}
-
-	if err := s3Service.Delete(ctx, command.S3.Bucket, objectsToDelete); err != nil {
+	if err := keepRelativeOplogBackups(ctx, s3Service, command); err != nil {
 		return err
 	}
 
@@ -257,14 +229,13 @@ func keepRecentBackups(ctx context.Context, s3Service *services.S3Service, comma
 
 	log.Info().Msgf("Keep most Recent %d Backups", command.Mongo.KeepRecentN)
 
-	var err error
-	var resp *s3.ListObjectsV2Output
-
-	if resp, err = s3Service.List(
+	resp, err := s3Service.List(
 		ctx,
 		command.S3.Bucket,
 		helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.Database),
-	); err != nil {
+	)
+
+	if err != nil {
 		log.Error().Err(err).Msg("Failed to list backups")
 		return err
 	}
@@ -296,15 +267,77 @@ func keepRecentBackups(ctx context.Context, s3Service *services.S3Service, comma
 	return nil
 }
 
-func getOplogConfig(ctx context.Context, s3Service *services.S3Service, command *DumpCommand) (*models.OplogConfig, error) {
+func keepRelativeOplogBackups(ctx context.Context, s3Service *services.S3Service, command *DumpCommand) error {
+	log.Info().Msg("Keep Relative Oplog Backups")
+
+	listResp, err := s3Service.List(ctx, command.S3.Bucket, helpers.S3BackupPrefix(command.S3.Prefix, ""))
+
+	if err != nil {
+		return err
+	}
+
+	sort.Slice(listResp.Contents, func(i, j int) bool {
+		return listResp.Contents[i].LastModified.Before(*listResp.Contents[j].LastModified)
+	})
+
+	oldestBackupKey := strings.TrimPrefix(*listResp.Contents[0].Key, helpers.S3BackupPrefix(command.S3.Prefix, ""))
+	oldestBackupKey = strings.TrimSuffix(oldestBackupKey, ".gzip")
+	oldestBackupKey = strings.TrimSuffix(oldestBackupKey, ".archive")
+
+	oldestBackupTime, err := time.Parse(helpers.TimeFormat, oldestBackupKey)
+
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to parse the oldest backup time")
+		return err
+	}
+
+	// ######################
+	// Get all oplog backups older than the oldest backup
+	// ######################
+	oplogBackupListResp, err := s3Service.List(ctx, command.S3.Bucket, helpers.S3OplogPrefix(command.S3.Prefix))
+	if err != nil {
+		return err
+	}
+
+	objectsToDelete := make([]types.ObjectIdentifier, 0)
+
+	for _, obj := range oplogBackupListResp.Contents {
+		if (*obj.Key) == helpers.S3OplogPrefix(command.S3.Prefix)+helpers.ConfigFileName {
+			continue
+		}
+
+		fileKey := strings.TrimPrefix(*obj.Key, helpers.S3OplogPrefix(command.S3.Prefix))
+		fileKey = strings.TrimSuffix(fileKey, ".tar.gz")
+
+		fileKey = strings.Split(fileKey, "_")[1]
+		toTimeOfLastBackup, err := time.Parse(helpers.TimeFormat, fileKey)
+
+		if err != nil {
+			log.Error().Err(err).Msgf("Failed to parse the time of %s", fileKey)
+			return err
+		}
+
+		if toTimeOfLastBackup.Before(oldestBackupTime) {
+			objectsToDelete = append(objectsToDelete, types.ObjectIdentifier{Key: obj.Key})
+		}
+	}
+
+	if err := s3Service.Delete(ctx, command.S3.Bucket, objectsToDelete); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getPreviousOplogRunData(ctx context.Context, s3Service *services.S3Service, command *DumpCommand) (*models.PreviousOplogRunInfo, error) {
 	log.Info().Msg("Getting the latest oplog config")
 
-	oplogKeyWithPrefix := fmt.Sprintf("%s/%s", helpers.S3OplogPrefix(command.S3.Prefix), helpers.ConfigFileName)
+	oplogKeyWithPrefix := helpers.S3OplogPrefix(command.S3.Prefix) + helpers.ConfigFileName
 
 	resp, err := s3Service.Get(ctx, command.S3.Bucket, oplogKeyWithPrefix)
 
 	if err != nil {
-		var responseError *awshttp.ResponseError
+		var responseError *awsHttp.ResponseError
 
 		if ok := errors.As(err, &responseError); !ok {
 			log.Error().Err(err).Msg("Failed to get config file from S3")
@@ -322,7 +355,7 @@ func getOplogConfig(ctx context.Context, s3Service *services.S3Service, command 
 
 	defer resp.Body.Close()
 
-	var oplogConfig models.OplogConfig
+	var oplogConfig models.PreviousOplogRunInfo
 	if err := json.NewDecoder(resp.Body).Decode(&oplogConfig); err != nil {
 		log.Error().Err(err).Msg("Failed to decode the config file")
 		return nil, err

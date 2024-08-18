@@ -29,7 +29,7 @@ func (command DatabaseRestoreCommand) Run() error {
 	var restoreOptions *mongorestore.MongoRestore
 	var backup *s3.GetObjectOutput
 
-	backupDir, _ := strings.CutSuffix(command.Mongo.BackupDir, "/")
+	backupDir := strings.TrimSuffix(command.Mongo.BackupDir, "/")
 
 	// ########################
 	// If key is not provided, let user choose the backup to restore

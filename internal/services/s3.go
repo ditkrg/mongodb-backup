@@ -95,6 +95,7 @@ func (s3Service *S3Service) UploadFile(ctx context.Context, bucket string, key s
 
 func (s3Service *S3Service) Delete(ctx context.Context, bucket string, objectsToDelete []types.ObjectIdentifier) error {
 	if len(objectsToDelete) == 0 {
+		log.Info().Msg("No objects to delete from S3")
 		return nil
 	}
 

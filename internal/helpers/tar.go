@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"archive/tar"
-	"fmt"
 	"io"
 
 	"os"
@@ -12,8 +11,9 @@ import (
 )
 
 func TarDirectory(sourceDirPath string, fileName string) error {
+	log.Info().Msgf("adding directory %s to %s", sourceDirPath, fileName)
 
-	outputFilePath := fmt.Sprintf("%s/%s", sourceDirPath, fileName)
+	outputFilePath := sourceDirPath + fileName
 	outFile, err := os.Create(outputFilePath)
 
 	if err != nil {
@@ -82,6 +82,6 @@ func TarDirectory(sourceDirPath string, fileName string) error {
 		return err
 	}
 
-	log.Info().Msgf("Directory %s archived to %s", sourceDirPath, outputFilePath)
+	log.Info().Msgf("Directory %s added to %s", sourceDirPath, outputFilePath)
 	return nil
 }

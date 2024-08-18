@@ -31,7 +31,7 @@ type MongoDumpFlags struct {
 func (o *MongoDumpFlags) PrepareMongoDump() (*mongodump.MongoDump, error) {
 	log.Info().Msg("Preparing mongodump")
 
-	o.BackupDir, _ = strings.CutSuffix(o.BackupDir, "/")
+	o.BackupDir = strings.TrimSuffix(o.BackupDir, "/")
 
 	inputOptions := &mongodump.InputOptions{Query: o.Query}
 
