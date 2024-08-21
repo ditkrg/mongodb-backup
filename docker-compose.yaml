@@ -1,21 +1,16 @@
 services:
-  mongodb:
-    image: mongo:6.0
-    hostname: mongodb
-    restart: always
+  mongodb-primary:
+    image: bitnami/mongodb:6.0
     container_name: mongodb
-    ports: [27017:27017]
-    volumes: [./mongodb-keyfile.key:/data/mongodb-keyfile.key]
+    hostname: mongodb
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin
-    command:
-      [
-        "--replSet",
-        "dbrs",
-        "--keyFile",
-        "/data/mongodb-keyfile.key"
-      ]
+      - MONGODB_ROOT_USER=admin
+      - MONGODB_ROOT_PASSWORD=admin
+      - MONGODB_REPLICA_SET_KEY=mykeysfdfsdfsdfsdfsfdsfsdf
+      - MONGODB_REPLICA_SET_MODE=primary
+      - MONGODB_REPLICA_SET_NAME=replicaset
+    ports:
+      - 27017:27017
 
 
   minio:

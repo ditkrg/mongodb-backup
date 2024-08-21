@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/charmbracelet/lipgloss/list"
 	"github.com/ditkrg/mongodb-backup/internal/flags"
 	"github.com/ditkrg/mongodb-backup/internal/helpers"
 	"github.com/ditkrg/mongodb-backup/internal/services"
+	"github.com/rs/zerolog/log"
 )
 
 type ListCommand struct {
@@ -43,12 +45,14 @@ func (command *ListCommand) Run() error {
 
 	for _, object := range resp.Contents {
 		key := *object.Key
-		if !strings.Contains(key, helpers.ConfigFileName) {
-			if command.Oplog {
-				list = list.Item(object.LastModified.Format("2006-01-02 15:04:05 MST"))
-			} else {
-				list = list.Item(key)
-			}
+		if strings.Contains(key, helpers.ConfigFileName) {
+			continue
+		}
+
+		if command.Oplog {
+			list = list.Item(FormatOplogTime(key, command.S3.Prefix))
+		} else {
+			list = list.Item(key)
 		}
 	}
 
@@ -57,4 +61,24 @@ func (command *ListCommand) Run() error {
 
 	return nil
 
+}
+
+func FormatOplogTime(key string, prefix string) string {
+	key = strings.TrimSuffix(key, ".tar.gz")
+	key = strings.TrimPrefix(key, helpers.S3OplogPrefix(prefix))
+
+	fromString := strings.Split(key, "_")[0]
+	toString := strings.Split(key, "_")[1]
+
+	fromTime, err := time.Parse(helpers.TimeFormat, fromString)
+	if err != nil {
+		log.Panic().Err(err).Msg("Failed to parse time")
+	}
+
+	toTime, err := time.Parse(helpers.TimeFormat, toString)
+	if err != nil {
+		log.Panic().Err(err).Msg("Failed to parse time")
+	}
+
+	return fmt.Sprintf("%s ~ %s", fromTime.Format(helpers.HumanReadableTimeFormat), toTime.Format(helpers.HumanReadableTimeFormat))
 }

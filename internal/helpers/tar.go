@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"archive/tar"
+	"fmt"
 	"io"
 
 	"os"
@@ -83,5 +84,69 @@ func TarDirectory(sourceDirPath string, fileName string) error {
 	}
 
 	log.Info().Msgf("Directory %s added to %s", sourceDirPath, outputFilePath)
+	return nil
+}
+
+func ExtractTar(tarPath, destDir string) error {
+	log.Info().Msgf("Extracting %s to %s", tarPath, destDir)
+
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	// Open the tar file
+	file, err := os.Open(tarPath)
+	if err != nil {
+		return fmt.Errorf("failed to open tar file: %w", err)
+	}
+	defer file.Close()
+
+	// Create a tar reader
+	tarReader := tar.NewReader(file)
+
+	// Iterate through the files in the tar archive
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break // End of tar archive
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read tar file: %w", err)
+		}
+
+		// Get the individual file path and extract it
+		targetPath := filepath.Join(destDir, header.Name)
+
+		// Handle directories
+		switch header.Typeflag {
+		case tar.TypeDir:
+			// Create a directory
+			if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
+				return fmt.Errorf("failed to create directory: %w", err)
+			}
+		case tar.TypeReg:
+			// Create a file
+			outFile, err := os.Create(targetPath)
+			if err != nil {
+				return fmt.Errorf("failed to create file: %w", err)
+			}
+			defer outFile.Close()
+
+			// Copy the file content from the tar archive
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				return fmt.Errorf("failed to write file: %w", err)
+			}
+
+			// Restore file permissions
+			if err := os.Chmod(targetPath, os.FileMode(header.Mode)); err != nil {
+				return fmt.Errorf("failed to set file permissions: %w", err)
+			}
+		default:
+			// Skip unsupported file types
+			continue
+		}
+	}
+
+	log.Info().Msgf("Extracted %s to %s", tarPath, destDir)
 	return nil
 }

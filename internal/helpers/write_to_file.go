@@ -1,14 +1,22 @@
 package helpers
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/rs/zerolog/log"
 )
 
-func WriteToFile(body io.ReadCloser, filePath string) error {
+func WriteToFile(body io.ReadCloser, dir string, fileName string) error {
 	defer body.Close()
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	filePath := filepath.Join(dir, fileName)
 
 	log.Info().Msgf("Writing backup to %s", filePath)
 

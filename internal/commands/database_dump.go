@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -89,6 +90,8 @@ func startBackup(command *DumpCommand) error {
 	); err != nil {
 		return err
 	}
+
+	os.Remove(mongoDump.OutputOptions.Archive)
 
 	//  ######################
 	//  Keep the latest N backups
@@ -192,6 +195,8 @@ func startOplogBackup(command *DumpCommand) error {
 		return err
 	}
 
+	os.RemoveAll(tarFileDir)
+
 	// ######################
 	// Upload a new oplog config
 	// ######################
@@ -224,7 +229,7 @@ func startOplogBackup(command *DumpCommand) error {
 }
 
 func keepRecentBackups(ctx context.Context, s3Service *services.S3Service, command *DumpCommand) error {
-	if command.Mongo.KeepRecentN > 0 {
+	if command.Mongo.KeepRecentN <= 0 {
 		return nil
 	}
 
@@ -318,7 +323,8 @@ func keepRelativeOplogBackups(ctx context.Context, s3Service *services.S3Service
 			return err
 		}
 
-		if toTimeOfLastBackup.Before(oldestBackupTime) {
+		shouldKeepObject := toTimeOfLastBackup.After(oldestBackupTime)
+		if !shouldKeepObject {
 			objectsToDelete = append(objectsToDelete, types.ObjectIdentifier{Key: obj.Key})
 		}
 	}

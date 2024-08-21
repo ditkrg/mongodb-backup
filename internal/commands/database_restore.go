@@ -2,7 +2,8 @@ package commands
 
 import (
 	"context"
-	"fmt"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,19 +51,24 @@ func (command DatabaseRestoreCommand) Run() error {
 	// ########################
 	// Write backup to file
 	// ########################
-	filePath := fmt.Sprintf("%s/%d", backupDir, time.Now().Unix())
-
-	if err := helpers.WriteToFile(backup.Body, filePath); err != nil {
+	fileName := strconv.FormatInt(time.Now().Unix(), 10)
+	if err := helpers.WriteToFile(backup.Body, backupDir, fileName); err != nil {
 		return err
 	}
 
 	log.Info().Msgf("Restoring backup %s", command.Key)
 
-	if restoreOptions, err = command.Mongo.PrepareBackupMongoRestoreOptions(filePath); err != nil {
+	// ########################
+	// Prepare restore options
+	// ########################
+	if restoreOptions, err = command.Mongo.PrepareBackupMongoRestoreOptions(filepath.Join(backupDir, fileName)); err != nil {
 		log.Err(err).Msg("Failed to prepare restore options")
 		return err
 	}
 
+	// ########################
+	// Restore backup
+	// ########################
 	result := restoreOptions.Restore()
 
 	if result.Err != nil {
@@ -70,8 +76,7 @@ func (command DatabaseRestoreCommand) Run() error {
 		return result.Err
 	}
 
-	log.Info().Msgf("Successfully restored %d", result.Successes)
-	log.Info().Msgf("Failed to restore %d", result.Failures)
+	log.Info().Msgf("Successfully restored %d, Failed to restore %d", result.Successes, result.Failures)
 
 	return nil
 }

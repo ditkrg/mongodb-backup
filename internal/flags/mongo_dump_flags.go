@@ -24,7 +24,7 @@ type MongoDumpFlags struct {
 	OpLog                      bool           `env:"OPLOG" name:"oplog" help:"take an oplog dump"`
 	SkipUsersAndRoles          bool           `env:"SKIP_USERS_AND_ROLES" help:"Skip dumping the users and roles in the database"`
 	NumParallelCollections     int            `env:"NUM_PARALLEL_COLLECTIONS" default:"1" help:"The number of collections to dump in parallel"`
-	KeepRecentN                int            `env:"KEEP_RECENT_N" default:"1" help:"The number of collections to dump in parallel"`
+	KeepRecentN                int            `env:"KEEP_RECENT_N" default:"10" help:"The number of collections to dump in parallel"`
 	Verbosity                  VerbosityFlags `embed:"" prefix:"verbosity-" envprefix:"VERBOSITY__"`
 }
 
@@ -56,7 +56,10 @@ func (o *MongoDumpFlags) PrepareMongoDump() (*mongodump.MongoDump, error) {
 		toolOptions.Namespace = &options.Namespace{DB: "local", Collection: "oplog.rs"}
 	}
 
-	toolOptions.NormalizeOptionsAndURI()
+	if err := toolOptions.NormalizeOptionsAndURI(); err != nil {
+		log.Error().Err(err).Msg("Failed to normalize options and URI")
+		return nil, err
+	}
 
 	mongodump := &mongodump.MongoDump{
 		SkipUsersAndRoles: o.SkipUsersAndRoles,
