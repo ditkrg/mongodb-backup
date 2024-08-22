@@ -256,7 +256,33 @@ func keepRecentBackups(ctx context.Context, s3Service *services.S3Service, comma
 		objectsToDelete := make([]types.ObjectIdentifier, backupsToDeleteCount)
 
 		sort.Slice(resp.Contents, func(i, j int) bool {
-			return resp.Contents[i].LastModified.After(*resp.Contents[j].LastModified)
+			prefix := helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.Database)
+
+			iKey := *resp.Contents[i].Key
+			jKey := *resp.Contents[j].Key
+
+			iTimeString := strings.TrimPrefix(iKey, prefix)
+			jTimeString := strings.TrimPrefix(jKey, prefix)
+
+			iTimeString = strings.TrimSuffix(iTimeString, ".gzip")
+			jTimeString = strings.TrimSuffix(jTimeString, ".gzip")
+
+			iTimeString = strings.TrimSuffix(iTimeString, ".archive")
+			jTimeString = strings.TrimSuffix(jTimeString, ".archive")
+
+			iTime, err := time.Parse(helpers.TimeFormat, iTimeString)
+			if err != nil {
+				log.Panic().Err(err).Msgf("Failed to parse time from %s", iKey)
+				return false
+			}
+
+			jTime, err := time.Parse(helpers.TimeFormat, jTimeString)
+			if err != nil {
+				log.Panic().Err(err).Msgf("Failed to parse time from %s", jKey)
+				return false
+			}
+
+			return iTime.After(jTime)
 		})
 
 		for i, obj := range resp.Contents[command.Mongo.KeepRecentN:] {
