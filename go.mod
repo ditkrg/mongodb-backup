@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.27
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.58.3
 	github.com/charmbracelet/huh v0.5.2
+	github.com/charmbracelet/lipgloss v0.12.1
 	github.com/joho/godotenv v1.5.1
 	github.com/mongodb/mongo-tools v0.0.0-20240802142803-70f1e402fe5e
 	github.com/rs/zerolog v1.33.0
@@ -29,7 +30,6 @@ require (
 	github.com/catppuccin/go v0.2.0 // indirect
 	github.com/charmbracelet/bubbles v0.18.0 // indirect
 	github.com/charmbracelet/bubbletea v0.26.6 // indirect
-	github.com/charmbracelet/lipgloss v0.12.1 // indirect
 	github.com/charmbracelet/x/ansi v0.1.4 // indirect
 	github.com/charmbracelet/x/exp/strings v0.0.0-20240722160745-212f7b056ed0 // indirect
 	github.com/charmbracelet/x/input v0.1.3 // indirect
@@ -58,7 +58,6 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
 	go.mongodb.org/mongo-driver v1.16.0 // indirect
-	golang.org/x/build v0.0.0-20240820175127-ec1c45197c35 // indirect
 	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/exp v0.0.0-20240529005216-23cca8864a10 // indirect
 	golang.org/x/sync v0.8.0 // indirect
