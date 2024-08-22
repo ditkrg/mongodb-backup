@@ -10,12 +10,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "./main.go",
-            "args": [
-                "restore",
-                "pitr",
-                // "--mongo-oplog-limit-from=2021-08-21 11:34:00 +0000",
-                // "--mongo-oplog-limit-to=2024-08-21 13:45:56 +0000",
-            ]
+            "args": []
         }
     ]
 }
