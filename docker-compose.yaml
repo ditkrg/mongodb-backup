@@ -6,7 +6,7 @@ services:
     environment:
       - MONGODB_ROOT_USER=admin
       - MONGODB_ROOT_PASSWORD=admin
-      - MONGODB_REPLICA_SET_KEY=mykeysfdfsdfsdfsdfsfdsfsdf
+      - MONGODB_REPLICA_SET_KEY=4qJT9NNt80n9idLBjLdicIK5LrXoUxVx
       - MONGODB_REPLICA_SET_MODE=primary
       - MONGODB_REPLICA_SET_NAME=replicaset
     ports:
