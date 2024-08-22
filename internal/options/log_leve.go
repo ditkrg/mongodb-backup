@@ -18,7 +18,7 @@ const (
 )
 
 type LogLevel struct {
-	Level string `env:"LOG_LEVEL,default=Error"`
+	Level string `env:"LOG_LEVEL,default=Info"`
 }
 
 func (l *LogLevel) Parse() (zerolog.Level, error) {
