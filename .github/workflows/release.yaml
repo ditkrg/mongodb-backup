@@ -29,7 +29,7 @@ jobs:
   build-image:
     uses: ditkrg/build-image-workflow/.github/workflows/workflow.yaml@v1
     with:
-      image: common/mongodb-backup
+      image: common/mongodb-backup-cli
     secrets:
       username: ${{ secrets.HARBOR_USER }}
       password: ${{ secrets.HARBOR_TOKEN }}
