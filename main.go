@@ -2,89 +2,75 @@ package main
 
 import (
 	"context"
-	"time"
 
-	"github.com/ditkrg/mongodb-backup/internal/models"
+	"github.com/alecthomas/kong"
+	"github.com/ditkrg/mongodb-backup/internal/commands"
 	"github.com/ditkrg/mongodb-backup/internal/options"
-	"github.com/ditkrg/mongodb-backup/internal/services"
+	"github.com/joho/godotenv"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/sethvargo/go-envconfig"
 )
 
+type CLI struct {
+	Version kong.VersionFlag `short:"v" help:"Print the version number"`
+
+	Restore struct {
+		Database    commands.DatabaseRestoreCommand `cmd:"" name:"database" help:"Restore a Database/full backup"`
+		PitrRestore commands.OplogRestoreCommand    `cmd:"" name:"oplog" help:"Restore an Oplog backup"`
+	} `cmd:""`
+
+	List commands.ListCommand `cmd:"" name:"list" help:"List backups"`
+	Dump commands.DumpCommand `cmd:"" name:"dump" help:"Take a database or point-in-time backup"`
+}
+
 func main() {
-	config := options.LoadConfig()
+	// #############################
+	// Load environment variables
+	// #############################
+	godotenv.Load(".env")
 
-	if config.MongoDB.OpLog {
-		startOplogBackup(config)
-	} else {
-		startBackup(config)
+	// #############################
+	// Set global log level
+	// #############################
+	setGlobalLogLevel()
+
+	// #############################
+	// Prepare CLI
+	// #############################
+	cli := &CLI{}
+
+	ctx := kong.Parse(
+		cli,
+		kong.Description("A CLI tool for MongoDB backups restore."),
+		kong.ConfigureHelp(kong.HelpOptions{
+			Compact: true,
+		}),
+		kong.Vars{
+			"version": "1.0.0",
+		},
+	)
+
+	// #############################
+	// Run the command
+	// #############################
+	if err := ctx.Run(); err != nil {
+		log.Fatal().Err(err).Msg("Failed to run the command")
 	}
 }
 
-func startBackup(config *options.Options) {
-	// ######################
-	// dump database
-	// ######################
-	services.StartDatabaseDump(config.MongoDB)
+func setGlobalLogLevel() {
+	var c options.LogLevel
+	var err error
+	var level zerolog.Level
 
-	// ######################
-	// Prepare S3 Service
-	// ######################
-	ctx := context.Background()
-	s3Service := services.NewS3Service(config.S3)
-
-	// ######################
-	// Upload backup to S3
-	// ######################
-	s3Service.StartBackupUpload(ctx, config)
-
-	//  ######################
-	//  Keep the latest N backups
-	//  ######################
-	if config.S3.KeepRecentN > 0 {
-		s3Service.KeepMostRecentN(ctx, config)
+	if err = envconfig.Process(context.Background(), &c); err != nil {
+		log.Fatal().Err(err).Send()
 	}
 
-	log.Info().Msg("Backup completed successfully")
-}
-
-func startOplogBackup(config *options.Options) {
-	// ######################
-	// Prepare S3 Service
-	// ######################
-	ctx := context.Background()
-	s3Service := services.NewS3Service(config.S3)
-
-	// ######################
-	// Check if a backup Exists
-	// ######################
-	if exists := s3Service.ObjectExistsAt(ctx, config.S3.Bucket, config.S3.BackupDirPath("")); !exists {
-		log.Error().Msgf("no backups found in %s/%s, there must be a full backup before oplog backup", config.S3.Bucket, config.S3.BackupDirPath(""))
-		return
+	if level, err = c.Parse(); err != nil {
+		log.Fatal().Err(err).Send()
 	}
 
-	// ######################
-	// Get the latest oplog config
-	// ######################
-	oplogConfig := s3Service.GetOplogConfig(ctx, config)
-
-	// ######################
-	// dump oplog
-	// ######################
-	startTime := time.Now().Unix()
-	services.StartOplogDump(config.MongoDB, oplogConfig)
-
-	// ######################
-	// Upload oplog to S3
-	// ######################
-	s3Service.UploadOplog(ctx, config)
-
-	// ######################
-	// Update the latest oplog config
-	// ######################
-	s3Service.UploadOplogConfig(ctx, config, &models.OplogConfig{LastJobTime: startTime})
-
-	// ######################
-	// Keep Relative oplog backups
-	// ######################
-	s3Service.KeepRelativeOplogBackups(ctx, config)
+	zerolog.SetGlobalLevel(level)
 }
