@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -116,15 +115,17 @@ func startOplogBackup(command *DumpCommand) error {
 	// ######################
 	// Check if a backup Exists
 	// ######################
-	exists, err := s3Service.ObjectsExistsAt(ctx, command.S3.Bucket, helpers.S3BackupPrefix(command.S3.Prefix, ""))
+	bucketObjects, err := s3Service.List(ctx, command.S3.Bucket, helpers.S3BackupPrefix(command.S3.Prefix, ""))
 	if err != nil {
 		return err
 	}
 
-	if !exists {
+	if len(bucketObjects.Contents) == 0 {
 		log.Info().Msgf("no backups found in %s/%s, there must be a full backup before oplog backup", command.S3.Bucket, helpers.S3BackupPrefix(command.S3.Prefix, ""))
 		return nil
 	}
+
+	log.Info().Msgf("Found %d objects in %s/%s", len(bucketObjects.Contents), command.S3.Bucket, helpers.S3BackupPrefix(command.S3.Prefix, ""))
 
 	// ######################
 	// Get the latest oplog config
@@ -149,15 +150,18 @@ func startOplogBackup(command *DumpCommand) error {
 	var s3OpLogBackupKey string
 
 	if previousOplogRunInfo == nil {
-		previousOplogRunInfo = &models.PreviousOplogRunInfo{OplogTakenFrom: "0", OplogTakenTo: "0"}
-		fromTime := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC).Format(helpers.TimeFormat)
-		s3OpLogBackupKey = fmt.Sprintf("%s_%s.tar.gz", fromTime, startTime)
-		log.Info().Msg("Taking a full OpLog backup")
-	} else {
-		s3OpLogBackupKey = fmt.Sprintf("%s_%s.tar.gz", previousOplogRunInfo.OplogTakenTo, startTime)
-		mongoDump.InputOptions.Query = fmt.Sprintf(helpers.OplogQuery, previousOplogRunInfo.OplogTakenTo, startTime)
-		log.Info().Msgf("Taking OpLog from %s to %s", previousOplogRunInfo.OplogTakenTo, startTime)
+		helpers.SortByKeyTimeStamp(bucketObjects.Contents, helpers.S3BackupPrefix(command.S3.Prefix, ""))
+		key := *bucketObjects.Contents[0].Key
+		key = strings.TrimPrefix(key, helpers.S3BackupPrefix(command.S3.Prefix, ""))
+		key = strings.TrimSuffix(key, ".gzip")
+		key = strings.TrimSuffix(key, ".archive")
+		previousOplogRunInfo = &models.PreviousOplogRunInfo{OplogTakenFrom: "0", OplogTakenTo: key}
 	}
+
+	s3OpLogBackupKey = fmt.Sprintf("%s_%s.tar.gz", previousOplogRunInfo.OplogTakenTo, startTime)
+	mongoDump.InputOptions.Query = fmt.Sprintf(helpers.OplogQuery, previousOplogRunInfo.OplogTakenTo, startTime)
+
+	log.Info().Msgf("Taking OpLog from %s to %s", previousOplogRunInfo.OplogTakenTo, startTime)
 
 	// ######################
 	// dump oplog
@@ -255,37 +259,9 @@ func keepRecentBackups(ctx context.Context, s3Service *services.S3Service, comma
 		backupsToDeleteCount := s3BackupCount - command.Mongo.KeepRecentN
 		objectsToDelete := make([]types.ObjectIdentifier, backupsToDeleteCount)
 
-		sort.Slice(resp.Contents, func(i, j int) bool {
-			prefix := helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.Database)
+		helpers.SortByKeyTimeStamp(resp.Contents, helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.Database))
 
-			iKey := *resp.Contents[i].Key
-			jKey := *resp.Contents[j].Key
-
-			iTimeString := strings.TrimPrefix(iKey, prefix)
-			jTimeString := strings.TrimPrefix(jKey, prefix)
-
-			iTimeString = strings.TrimSuffix(iTimeString, ".gzip")
-			jTimeString = strings.TrimSuffix(jTimeString, ".gzip")
-
-			iTimeString = strings.TrimSuffix(iTimeString, ".archive")
-			jTimeString = strings.TrimSuffix(jTimeString, ".archive")
-
-			iTime, err := time.Parse(helpers.TimeFormat, iTimeString)
-			if err != nil {
-				log.Panic().Err(err).Msgf("Failed to parse time from %s", iKey)
-				return false
-			}
-
-			jTime, err := time.Parse(helpers.TimeFormat, jTimeString)
-			if err != nil {
-				log.Panic().Err(err).Msgf("Failed to parse time from %s", jKey)
-				return false
-			}
-
-			return iTime.After(jTime)
-		})
-
-		for i, obj := range resp.Contents[command.Mongo.KeepRecentN:] {
+		for i, obj := range resp.Contents[:backupsToDeleteCount] {
 			objectsToDelete[i] = types.ObjectIdentifier{
 				Key: obj.Key,
 			}
@@ -308,9 +284,7 @@ func keepRelativeOplogBackups(ctx context.Context, s3Service *services.S3Service
 		return err
 	}
 
-	sort.Slice(listResp.Contents, func(i, j int) bool {
-		return listResp.Contents[i].LastModified.Before(*listResp.Contents[j].LastModified)
-	})
+	helpers.SortByKeyTimeStamp(listResp.Contents, helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.Database))
 
 	oldestBackupKey := strings.TrimPrefix(*listResp.Contents[0].Key, helpers.S3BackupPrefix(command.S3.Prefix, ""))
 	oldestBackupKey = strings.TrimSuffix(oldestBackupKey, ".gzip")
