@@ -17,12 +17,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type PitrRestoreCommand struct {
+type OplogRestoreCommand struct {
 	S3    flags.S3Flags               `embed:"" group:"Common S3 Flags:"`
 	Mongo flags.MongoPitrRestoreFlags `embed:"" prefix:"mongo-" envprefix:"MONGO_PITR__" group:"Common MongoDB Flags:" `
 }
 
-func (command *PitrRestoreCommand) Run() error {
+func (command *OplogRestoreCommand) Run() error {
 
 	// ###############################
 	// Initialize the S3 Service
@@ -188,7 +188,7 @@ func (command *PitrRestoreCommand) Run() error {
 	return nil
 }
 
-func getOplogLimit(command *PitrRestoreCommand) (*time.Time, *time.Time, error) {
+func getOplogLimit(command *OplogRestoreCommand) (*time.Time, *time.Time, error) {
 	if command.Mongo.OplogLimitFrom != "" || command.Mongo.OplogLimitTo != "" {
 		log.Info().Msg("Parse oplog limits")
 	}

@@ -16,18 +16,28 @@ type CLI struct {
 	Version kong.VersionFlag `short:"v" help:"Print the version number"`
 
 	Restore struct {
-		List        commands.ListCommand            `cmd:"" name:"list" help:"List backups"`
-		Database    commands.DatabaseRestoreCommand `cmd:"" name:"database" help:"Restore a backup"`
-		PitrRestore commands.PitrRestoreCommand     `cmd:"" name:"pitr" help:"Perform a point-in-time restore"`
+		Database    commands.DatabaseRestoreCommand `cmd:"" name:"database" help:"Restore a Database/full backup"`
+		PitrRestore commands.OplogRestoreCommand    `cmd:"" name:"oplog" help:"Restore an Oplog backup"`
 	} `cmd:""`
 
+	List commands.ListCommand `cmd:"" name:"list" help:"List backups"`
 	Dump commands.DumpCommand `cmd:"" name:"dump" help:"Take a database or point-in-time backup"`
 }
 
 func main() {
+	// #############################
+	// Load environment variables
+	// #############################
 	godotenv.Load(".env")
+
+	// #############################
+	// Set global log level
+	// #############################
 	setGlobalLogLevel()
 
+	// #############################
+	// Prepare CLI
+	// #############################
 	cli := &CLI{}
 
 	ctx := kong.Parse(
@@ -37,10 +47,13 @@ func main() {
 			Compact: true,
 		}),
 		kong.Vars{
-			"version": "0.0.1",
+			"version": "1.0.0",
 		},
 	)
 
+	// #############################
+	// Run the command
+	// #############################
 	if err := ctx.Run(); err != nil {
 		log.Fatal().Err(err).Msg("Failed to run the command")
 	}

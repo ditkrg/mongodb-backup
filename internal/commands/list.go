@@ -41,6 +41,13 @@ func (command *ListCommand) Run() error {
 		return err
 	}
 
+	if len(resp.Contents) == 0 {
+		message := "No backups found"
+		log.Info().Msg(message)
+		fmt.Println(message)
+		return nil
+	}
+
 	list := list.New()
 
 	for _, object := range resp.Contents {
