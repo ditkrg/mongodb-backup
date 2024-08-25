@@ -76,7 +76,7 @@ func (o *MongoPitrRestoreFlags) PrepareOplogMongoRestoreOptions(backupDir string
 
 	toolOptions := options.New("mongodb-restore", "", "", "", false, options.EnabledOptions{Auth: true})
 	toolOptions.ConnectionString = o.ConnectionString
-	toolOptions.Verbosity = &options.Verbosity{Quiet: o.Verbosity.Quiet, VLevel: o.Verbosity.Level}
+	toolOptions.SetVerbosity(o.Verbosity.Level)
 
 	if err := toolOptions.NormalizeOptionsAndURI(); err != nil {
 		log.Error().Err(err).Msg("Failed to normalize options and URI")

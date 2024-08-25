@@ -46,7 +46,7 @@ func (o *MongoDumpFlags) PrepareMongoDump() (*mongodump.MongoDump, error) {
 
 	toolOptions := options.New("mongodb-backup", "", "", "", false, options.EnabledOptions{Auth: true})
 	toolOptions.ConnectionString = o.ConnectionString
-	toolOptions.Verbosity = &options.Verbosity{Quiet: o.Verbosity.Quiet, VLevel: o.Verbosity.Level}
+	toolOptions.SetVerbosity(o.Verbosity.Level)
 	toolOptions.Namespace = &options.Namespace{DB: o.Database, Collection: o.Collection}
 
 	if o.OpLog {
