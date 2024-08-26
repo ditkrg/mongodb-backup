@@ -37,3 +37,8 @@ kubernetes/**/*-secret*.properties
 .github/environments/
 
 backups
+
+*.tgz
+/.idea/*
+.vscode
+.DS_Store

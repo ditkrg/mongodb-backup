@@ -1,0 +1,64 @@
+concurrencyPolicy: Forbid
+failedJobsHistoryLimit: 3
+successfulJobsHistoryLimit: 3
+schedule:
+activeDeadlineSeconds: 600
+ttlSecondsAfterFinished: 300
+backoffLimit: 3
+restartPolicy: OnFailure
+
+global:
+  image:
+    fullPath:
+    registry:
+    repository:
+    tag:
+    pullPolicy:
+
+securityContext:
+  runAsUser: 1001
+  runAsGroup: 1001
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  privileged: false
+  capabilities:
+    drop:
+      - ALL
+
+ephemeral:
+  volumeClaimTemplate:
+    spec:
+      resources:
+        limits:
+          storage: 2Gi
+        request:
+          storage: 2Gi
+
+resources:
+  requests:
+    cpu: 100m
+  limits:
+    memory: 200Mi
+
+image:
+  fullPath:
+  registry: reg.dev.krd
+  repository: common/mongodb-backup-cli
+  tag: 0.1.2
+  pullPolicy: IfNotPresent
+
+jobs:
+  full-backup:
+    schedule: "0 0 * * *"
+
+    configs:
+      test: test
+
+    sealedSecrets:
+      enabled: true
+      name: test
+      encryptedData:
+        infisicalToken: "AgB9bG9jYWwv"
+
+    args:
+      - "dump"

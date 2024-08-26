@@ -11,9 +11,24 @@ on:
 concurrency: release-${{ github.ref }}
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    concurrency: build-${{ github.ref_name }}
+    outputs:
+      tag: ${{ steps.build-image.outputs.tag }}
+    steps:
+      - id: build-image
+        name: Build and Push Image
+        uses: ditkrg/build-image-workflow@v1
+        with:
+          image: common/mongodb-backup-cli
+          username: ${{ secrets.HARBOR_USER }}
+          password: ${{ secrets.HARBOR_TOKEN }}
+
   build-cli:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    needs: build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,10 +41,28 @@ jobs:
         with:
           files: mongodb-backup
 
-  build-image:
-    uses: ditkrg/build-image-workflow/.github/workflows/workflow.yaml@v1
-    with:
-      image: common/mongodb-backup-cli
-    secrets:
-      username: ${{ secrets.HARBOR_USER }}
-      password: ${{ secrets.HARBOR_TOKEN }}
+      - name: Install yq
+        uses: jaxxstorm/action-install-gh-release@v1
+        with:
+          repo: mikefarah/yq
+          tag: v4.40.2
+          cache: enable
+
+      - name: Update Helm values
+        run: yq -i '.image.fullPath = strenv(TAG)' ./helm/values.yaml
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+
+      - name: install dependencies
+        working-directory: ./helm
+        run: helm dependency build
+
+      - name: Push Helm chart to OCI compatible registry
+        uses: bsord/helm-push@v4.2.0
+        with:
+          useOCIRegistry: true
+          registry-url: oci://reg.dev.krd/charts
+          username: ${{ secrets.HARBOR_USER }}
+          access-token: ${{ secrets.HARBOR_TOKEN }}
+          chart-folder: ./helm
+
