@@ -52,7 +52,7 @@ jobs:
 
       - name: Update Helm values
         run: |
-          VERSION=$(echo "${TAG_NAME//v}")
+          export VERSION=$(echo "${TAG_NAME//v}")
           yq -i '.image.tag = strenv(VERSION)' ./helm/values.yaml
           yq -i '.version = strenv(VERSION)' ./helm/Chart.yaml
           yq -i '.appVersion = strenv(VERSION)' ./helm/Chart.yaml
