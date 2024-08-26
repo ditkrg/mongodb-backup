@@ -28,6 +28,8 @@ jobs:
   build-cli:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
     needs: build
     steps:
       - name: Checkout
@@ -49,9 +51,23 @@ jobs:
           cache: enable
 
       - name: Update Helm values
-        run: yq -i '.image.fullPath = strenv(TAG)' ./helm/values.yaml
+        run: |
+          VERSION=$(echo "${TAG_NAME//v}")
+          yq -i '.image.tag = strenv(VERSION)' ./helm/values.yaml
+          yq -i '.version = strenv(VERSION)' ./helm/Chart.yaml
+          yq -i '.appVersion = strenv(VERSION)' ./helm/Chart.yaml
         env:
-          TAG: ${{ needs.build.outputs.tag }}
+          TAG_NAME: ${{ github.ref_name }}
+
+      - name: Run the Action
+        uses: devops-infra/action-commit-push@master
+        with:
+          github_token: "${{ secrets.GITHUB_TOKEN }}"
+          add_timestamp: true
+          commit_prefix: "[AUTO]"
+          commit_message: "Automatic commit"
+          force: false
+          target_branch: update/version
 
       - name: install dependencies
         working-directory: ./helm
