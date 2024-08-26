@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.28
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.60.0
 	github.com/charmbracelet/huh v0.5.2
-	github.com/charmbracelet/lipgloss v0.12.1
+	github.com/charmbracelet/lipgloss v0.13.0
 	github.com/joho/godotenv v1.5.1
 	github.com/mongodb/mongo-tools v0.0.0-20240802142803-70f1e402fe5e
 	github.com/rs/zerolog v1.33.0
