@@ -65,7 +65,7 @@ jobs:
           github_token: "${{ secrets.GITHUB_TOKEN }}"
           commit_prefix: "[AUTO]"
           commit_message: "Automatic commit"
-          force: false
+          force: true
           target_branch: main
 
       - name: install dependencies
