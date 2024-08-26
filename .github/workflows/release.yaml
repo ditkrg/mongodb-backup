@@ -60,10 +60,16 @@ jobs:
       - name: Run the Action
         uses: devops-infra/action-commit-push@master
         with:
-          github_token: "${{ secrets.GITHUB_TOKEN }}"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_prefix: "[AUTO]"
-          commit_message: "Automatic commit"
-          force: true
+          commit_message: Automatic commit
+          target_branch: update-helm-chart
+
+      - name: Create Pr
+        uses: devops-infra/action-pull-request@v0.5.5
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          source_branch: update-helm-chart
           target_branch: main
 
       - name: install dependencies
