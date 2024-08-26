@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-type PitrBackup struct {
+type OplogBackup struct {
 	Key                      string
 	FileName                 string
 	FileNameWithoutExtension string

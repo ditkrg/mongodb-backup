@@ -16,8 +16,8 @@ type CLI struct {
 	Version kong.VersionFlag `short:"v" help:"Print the version number"`
 
 	Restore struct {
-		Database    commands.DatabaseRestoreCommand `cmd:"" name:"database" help:"Restore a Database/full backup"`
-		PitrRestore commands.OplogRestoreCommand    `cmd:"" name:"oplog" help:"Restore an Oplog backup"`
+		Database     commands.DatabaseRestoreCommand `cmd:"" name:"database" help:"Restore a Database/full backup"`
+		OplogRestore commands.OplogRestoreCommand    `cmd:"" name:"oplog" help:"Restore an Oplog backup"`
 	} `cmd:""`
 
 	List commands.ListCommand `cmd:"" name:"list" help:"List backups"`

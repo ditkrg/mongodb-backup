@@ -9,11 +9,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type MongoPitrRestoreFlags struct {
+type MongoOplogRestoreFlags struct {
 	ConnectionString       string   `required:"" env:"CONNECTION_STRING" help:"The connection to the MongoDB instance to restore to"`
 	BackupDir              string   `required:"" env:"BACKUP_DIR" help:"The directory to download the backup to and restore from"`
-	OplogLimitFrom         string   `env:"OPLOG_LIMIT_FROM" help:"The start time of the PITR restore."`
-	OplogLimitTo           string   `env:"OPLOG_LIMIT_TO" help:"The End time of the PITR restore."`
+	OplogLimitFrom         string   `env:"OPLOG_LIMIT_FROM" help:"The start time of the OpLog restore."`
+	OplogLimitTo           string   `env:"OPLOG_LIMIT_TO" help:"The End time of the OpLog restore."`
 	WriteConcern           string   `env:"WRITE_CONCERN" default:"majority" help:"Write concern for the restore operation"`
 	NSExclude              []string `env:"NS_EXCLUDE" help:"Namespaces (database.collection) to exclude from the restore"`
 	NSInclude              []string `env:"NS_INCLUDE" help:"Namespaces (database.collection) to include in the restore"`
@@ -37,7 +37,7 @@ type MongoPitrRestoreFlags struct {
 	Verbosity                VerbosityFlags `embed:"" prefix:"verbosity-" envprefix:"VERBOSITY__"`
 }
 
-func (o *MongoPitrRestoreFlags) PrepareOplogMongoRestoreOptions(backupDir string, to *time.Time) (*mongorestore.MongoRestore, error) {
+func (o *MongoOplogRestoreFlags) PrepareOplogMongoRestoreOptions(backupDir string, to *time.Time) (*mongorestore.MongoRestore, error) {
 	log.Info().Msg("preparing oplog mongodb restore options")
 
 	inputOptions := &mongorestore.InputOptions{

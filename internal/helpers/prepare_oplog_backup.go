@@ -8,31 +8,31 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func PrepareOplogBackup(pitrKey string, prefix string) models.PitrBackup {
+func PrepareOplogBackup(oplogKey string, prefix string) models.OplogBackup {
 
-	fileName := strings.TrimPrefix(pitrKey, S3OplogPrefix(prefix))
+	fileName := strings.TrimPrefix(oplogKey, S3OplogPrefix(prefix))
 	FileNameWithoutExtension := strings.TrimSuffix(fileName, ".tar.gz")
 	timeStringArray := strings.Split(FileNameWithoutExtension, "_")
 	var err error
 
-	pitrBackup := models.PitrBackup{
-		Key:                      pitrKey,
+	oplogBackup := models.OplogBackup{
+		Key:                      oplogKey,
 		FileName:                 fileName,
 		FileNameWithoutExtension: FileNameWithoutExtension,
 	}
 
-	pitrBackup.FromTime, err = time.Parse(TimeFormat, timeStringArray[0])
+	oplogBackup.FromTime, err = time.Parse(TimeFormat, timeStringArray[0])
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to parse time")
 	}
 
-	pitrBackup.ToTime, err = time.Parse(TimeFormat, timeStringArray[1])
+	oplogBackup.ToTime, err = time.Parse(TimeFormat, timeStringArray[1])
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to parse time")
 	}
 
-	pitrBackup.FromString = pitrBackup.FromTime.Format(HumanReadableTimeFormat)
-	pitrBackup.ToString = pitrBackup.ToTime.Format(HumanReadableTimeFormat)
+	oplogBackup.FromString = oplogBackup.FromTime.Format(HumanReadableTimeFormat)
+	oplogBackup.ToString = oplogBackup.ToTime.Format(HumanReadableTimeFormat)
 
-	return pitrBackup
+	return oplogBackup
 }

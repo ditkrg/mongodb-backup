@@ -18,8 +18,8 @@ import (
 )
 
 type OplogRestoreCommand struct {
-	S3    flags.S3Flags               `embed:"" group:"Common S3 Flags:"`
-	Mongo flags.MongoPitrRestoreFlags `embed:"" prefix:"mongo-" envprefix:"MONGO_PITR__" group:"Common MongoDB Flags:" `
+	S3    flags.S3Flags                `embed:"" group:"Common S3 Flags:"`
+	Mongo flags.MongoOplogRestoreFlags `embed:"" prefix:"mongo-" envprefix:"MONGO_OPLOG__" group:"Common MongoDB Flags:" `
 }
 
 func (command *OplogRestoreCommand) Run() error {
@@ -58,23 +58,23 @@ func (command *OplogRestoreCommand) Run() error {
 	// ###############################
 	// Prepare the list of backups model and backups to be restored
 	// ###############################
-	pitrBackupList := make([]models.PitrBackup, len(resp.Contents))
-	pitrToRestore := make([]models.PitrBackup, 0)
+	oplogBackupList := make([]models.OplogBackup, len(resp.Contents))
+	oplogToRestore := make([]models.OplogBackup, 0)
 
 	// ###############################
-	// Change backups to models.PitrBackup
+	// Change backups to models.oplogBackup
 	// ###############################
 	for i, obj := range resp.Contents {
 		key := *obj.Key
-		pitrBackupList[i] = helpers.PrepareOplogBackup(key, command.S3.Prefix)
+		oplogBackupList[i] = helpers.PrepareOplogBackup(key, command.S3.Prefix)
 	}
 
 	// ###############################
 	// Sort the backups by ToTime
 	// ###############################
-	sort.Slice(pitrBackupList, func(i, j int) bool {
-		iToTime := pitrBackupList[i].ToTime
-		jToTime := pitrBackupList[j].ToTime
+	sort.Slice(oplogBackupList, func(i, j int) bool {
+		iToTime := oplogBackupList[i].ToTime
+		jToTime := oplogBackupList[j].ToTime
 		return iToTime.Before(jToTime)
 	})
 
@@ -96,22 +96,22 @@ func (command *OplogRestoreCommand) Run() error {
 	// ###############################
 	// Download the backups
 	// ###############################
-	for _, pitrBackup := range pitrBackupList {
+	for _, oplogBackup := range oplogBackupList {
 
 		// ###############################
 		// Check if the backup should be restored
 		// ###############################
-		if !shouldRestoreBackup(oplogLimitFromTime, oplogLimitToTime, pitrBackup) {
+		if !shouldRestoreBackup(oplogLimitFromTime, oplogLimitToTime, oplogBackup) {
 
 			switch {
 			case oplogLimitFromTime != nil && oplogLimitToTime != nil:
-				log.Info().Msgf("Skipping backup %s as it is not in the range %s ~ %s", pitrBackup.Key, command.Mongo.OplogLimitFrom, command.Mongo.OplogLimitTo)
+				log.Info().Msgf("Skipping backup %s as it is not in the range %s ~ %s", oplogBackup.Key, command.Mongo.OplogLimitFrom, command.Mongo.OplogLimitTo)
 			case oplogLimitFromTime != nil:
-				log.Info().Msgf("Skipping backup %s as it is before %s", pitrBackup.Key, command.Mongo.OplogLimitFrom)
+				log.Info().Msgf("Skipping backup %s as it is before %s", oplogBackup.Key, command.Mongo.OplogLimitFrom)
 			case oplogLimitToTime != nil:
-				log.Info().Msgf("Skipping backup %s as it is after %s", pitrBackup.Key, command.Mongo.OplogLimitTo)
+				log.Info().Msgf("Skipping backup %s as it is after %s", oplogBackup.Key, command.Mongo.OplogLimitTo)
 			default:
-				log.Info().Msgf("Skipping backup %s as it is not in the range", pitrBackup.Key)
+				log.Info().Msgf("Skipping backup %s as it is not in the range", oplogBackup.Key)
 			}
 
 			continue
@@ -120,12 +120,12 @@ func (command *OplogRestoreCommand) Run() error {
 		// ###############################
 		// Add the backup to the list of backups to be restored
 		// ###############################
-		pitrToRestore = append(pitrToRestore, pitrBackup)
+		oplogToRestore = append(oplogToRestore, oplogBackup)
 
 		// ###############################
 		// Download the backup
 		// ###############################
-		obj, err := s3Service.Get(ctx, command.S3.Bucket, pitrBackup.Key)
+		obj, err := s3Service.Get(ctx, command.S3.Bucket, oplogBackup.Key)
 		if err != nil {
 			return err
 		}
@@ -133,7 +133,7 @@ func (command *OplogRestoreCommand) Run() error {
 		// ###############################
 		// Write the backup to file
 		// ###############################
-		if err := helpers.WriteToFile(obj.Body, downloadsDir, pitrBackup.FileName); err != nil {
+		if err := helpers.WriteToFile(obj.Body, downloadsDir, oplogBackup.FileName); err != nil {
 			return err
 		}
 	}
@@ -141,8 +141,8 @@ func (command *OplogRestoreCommand) Run() error {
 	// ###############################
 	// Restore the backups
 	// ###############################
-	for _, pitrBackup := range pitrToRestore {
-		tarPath := filepath.Join(downloadsDir, pitrBackup.FileName)
+	for _, oplogBackup := range oplogToRestore {
+		tarPath := filepath.Join(downloadsDir, oplogBackup.FileName)
 
 		// ###############################
 		// Extract the tar file
@@ -161,7 +161,7 @@ func (command *OplogRestoreCommand) Run() error {
 		// ###############################
 		// Prepare the mongodb options
 		// ###############################
-		pitrOptions, err := command.Mongo.PrepareOplogMongoRestoreOptions(restoreDir, oplogLimitToTime)
+		oplogOptions, err := command.Mongo.PrepareOplogMongoRestoreOptions(restoreDir, oplogLimitToTime)
 		if err != nil {
 			return err
 		}
@@ -170,7 +170,7 @@ func (command *OplogRestoreCommand) Run() error {
 		// Restore the oplog
 		// ###############################
 		log.Info().Msg("start mongodb restore")
-		result := pitrOptions.Restore()
+		result := oplogOptions.Restore()
 
 		if result.Err != nil {
 			log.Err(result.Err).Msg("Failed to restore oplog")
@@ -218,7 +218,7 @@ func getOplogLimit(command *OplogRestoreCommand) (*time.Time, *time.Time, error)
 	return oplogLimitFromTime, oplogLimitToTime, nil
 }
 
-func shouldRestoreBackup(from *time.Time, to *time.Time, backup models.PitrBackup) bool {
+func shouldRestoreBackup(from *time.Time, to *time.Time, backup models.OplogBackup) bool {
 	if from != nil && to != nil {
 		return (from.After(backup.FromTime) && from.Before(backup.ToTime)) ||
 			(to.After(backup.FromTime) && to.Before(backup.ToTime)) ||
