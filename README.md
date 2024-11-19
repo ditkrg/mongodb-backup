@@ -101,5 +101,5 @@ To take a dump of the oplog, you can run the following command:
 To restore the oplog, you can run the following command:
 
 ```bash
-<output_file_name> restore oplog
+<output_file_name> restore
 ```
