@@ -42,7 +42,7 @@ func startBackup(command *DumpCommand) error {
 
 	s3FileKey := fmt.Sprintf("%s.archive", timeNow)
 	if command.Mongo.Gzip {
-		s3FileKey = fmt.Sprintf("%s.gzip", timeNow)
+		s3FileKey = fmt.Sprintf("%s.gzip", s3FileKey)
 	}
 
 	s3FileKeyWithPrefix := helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.Database) + s3FileKey

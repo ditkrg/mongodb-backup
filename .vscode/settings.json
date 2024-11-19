@@ -4,11 +4,13 @@
         "batchv",
         "blockdev",
         "bson",
+        "charmbracelet",
         "clientretry",
         "corev",
         "dearmor",
         "ditkrg",
         "dpkg",
+        "envprefix",
         "fsize",
         "godotenv",
         "hostnames",
@@ -20,6 +22,7 @@
         "metav",
         "mongodbv",
         "mongodump",
+        "mongorestore",
         "mongosh",
         "Msgf",
         "noatime",
@@ -28,6 +31,7 @@
         "noproc",
         "nslookup",
         "Numa",
+        "Objcheck",
         "oneshot",
         "printjson",
         "progressor",
@@ -38,6 +42,8 @@
         "SSLCA",
         "subresource",
         "sysinit",
+        "temproles",
+        "tempusers",
         "zerolog"
     ]
 }

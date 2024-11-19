@@ -23,12 +23,12 @@ func PrepareOplogBackup(oplogKey string, prefix string) models.OplogBackup {
 
 	oplogBackup.FromTime, err = time.Parse(TimeFormat, timeStringArray[0])
 	if err != nil {
-		log.Panic().Err(err).Msg("Failed to parse time")
+		log.Panic().Err(err).Msg("Failed to parse oplog from time")
 	}
 
 	oplogBackup.ToTime, err = time.Parse(TimeFormat, timeStringArray[1])
 	if err != nil {
-		log.Panic().Err(err).Msg("Failed to parse time")
+		log.Panic().Err(err).Msg("Failed to parse oplog to time")
 	}
 
 	oplogBackup.FromString = oplogBackup.FromTime.Format(HumanReadableTimeFormat)
