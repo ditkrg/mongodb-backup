@@ -30,7 +30,7 @@ type DumpCommand struct {
 
 func (command DumpCommand) Run() error {
 
-	if command.Mongo.OpLog {
+	if command.Mongo.OutputOptions.OpLog {
 		return startOplogBackup(&command)
 	} else {
 		return startBackup(&command)
@@ -41,11 +41,11 @@ func startBackup(command *DumpCommand) error {
 	timeNow := time.Now().UTC().Format(helpers.TimeFormat)
 
 	s3FileKey := fmt.Sprintf("%s.archive", timeNow)
-	if command.Mongo.Gzip {
+	if command.Mongo.OutputOptions.Gzip {
 		s3FileKey = fmt.Sprintf("%s.gzip", s3FileKey)
 	}
 
-	s3FileKeyWithPrefix := helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.Database) + s3FileKey
+	s3FileKeyWithPrefix := helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.NamespaceOptions.Database) + s3FileKey
 
 	// ######################
 	// Prepare MongoDump
@@ -242,7 +242,7 @@ func keepRecentBackups(ctx context.Context, s3Service *services.S3Service, comma
 	resp, err := s3Service.List(
 		ctx,
 		command.S3.Bucket,
-		helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.Database),
+		helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.NamespaceOptions.Database),
 	)
 
 	if err != nil {
@@ -259,7 +259,7 @@ func keepRecentBackups(ctx context.Context, s3Service *services.S3Service, comma
 		backupsToDeleteCount := s3BackupCount - command.Mongo.KeepRecentN
 		objectsToDelete := make([]types.ObjectIdentifier, backupsToDeleteCount)
 
-		helpers.SortByKeyTimeStamp(resp.Contents, helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.Database))
+		helpers.SortByKeyTimeStamp(resp.Contents, helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.NamespaceOptions.Database))
 
 		for i, obj := range resp.Contents[:backupsToDeleteCount] {
 			objectsToDelete[i] = types.ObjectIdentifier{
@@ -284,7 +284,7 @@ func keepRelativeOplogBackups(ctx context.Context, s3Service *services.S3Service
 		return err
 	}
 
-	helpers.SortByKeyTimeStamp(listResp.Contents, helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.Database))
+	helpers.SortByKeyTimeStamp(listResp.Contents, helpers.S3BackupPrefix(command.S3.Prefix, command.Mongo.NamespaceOptions.Database))
 
 	oldestBackupKey := strings.TrimPrefix(*listResp.Contents[0].Key, helpers.S3BackupPrefix(command.S3.Prefix, ""))
 	oldestBackupKey = strings.TrimSuffix(oldestBackupKey, ".gzip")

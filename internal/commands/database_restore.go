@@ -23,16 +23,18 @@ import (
 
 type DatabaseRestoreCommand struct {
 	Key   string                  `optional:"" prefix:"s3-" help:"The key of the backup to restore."`
-	S3    flags.S3Flags           `embed:"" group:"Common S3 Flags:"`
-	Mongo flags.MongoRestoreFlags `embed:"" envprefix:"MONGO_RESTORE__" group:"Common Mongo Restore Flags:"`
+	S3    flags.S3Flags           `embed:"" group:"S3 Flags:"`
+	K8s   flags.K8sFlags          `embed:"" group:"kubernetes Flags:"`
+	Mongo flags.MongoRestoreFlags `embed:"" envprefix:"MONGO_RESTORE__"`
 }
 
 func (command DatabaseRestoreCommand) Run() error {
+
 	ctx := context.Background()
 	s3Service := services.NewS3Service(command.S3)
 
 	var err error
-	var restoreOptions *mongorestore.MongoRestore
+	var mongoRestore *mongorestore.MongoRestore
 	var backup *s3.GetObjectOutput
 
 	backupDir := strings.TrimSuffix(command.Mongo.BackupDir, "/")
@@ -57,7 +59,7 @@ func (command DatabaseRestoreCommand) Run() error {
 	// Write backup to file
 	// ########################
 	fileName := strconv.FormatInt(time.Now().Unix(), 10)
-	if err := helpers.WriteToFile(backup.Body, backupDir, fileName); err != nil {
+	if err := helpers.WriteToFile(backup.Body, backup.ContentLength, backupDir, fileName); err != nil {
 		return err
 	}
 
@@ -66,7 +68,7 @@ func (command DatabaseRestoreCommand) Run() error {
 	// ########################
 	// Prepare restore options
 	// ########################
-	if restoreOptions, err = command.Mongo.PrepareBackupMongoRestoreOptions(filepath.Join(backupDir, fileName)); err != nil {
+	if mongoRestore, err = command.Mongo.PrepareBackupMongoRestoreOptions(filepath.Join(backupDir, fileName)); err != nil {
 		log.Err(err).Msg("Failed to prepare restore options")
 		return err
 	}
@@ -74,7 +76,7 @@ func (command DatabaseRestoreCommand) Run() error {
 	// ########################
 	// Restore backup
 	// ########################
-	result := restoreOptions.Restore()
+	result := mongoRestore.Restore()
 
 	if result.Err != nil {
 		log.Err(result.Err).Msg("Failed to restore backup")
@@ -83,7 +85,7 @@ func (command DatabaseRestoreCommand) Run() error {
 
 	log.Info().Msgf("Successfully restored %d, Failed to restore %d", result.Successes, result.Failures)
 
-	if !command.Mongo.OplogReplay {
+	if !command.Mongo.InputOptions.OplogReplay {
 		return nil
 	}
 
@@ -221,7 +223,7 @@ func (command *DatabaseRestoreCommand) RestoreOplog(ctx context.Context, s3Servi
 		if !shouldRestoreBackup(oplogLimitFromTime, oplogLimitToTime, oplogBackup) {
 			switch {
 			case oplogLimitToTime != nil:
-				log.Info().Msgf("Skipping backup %s as it is not in the range %s ~ %s", oplogBackup.Key, backupRestoreTime, command.Mongo.OplogLimitTo)
+				log.Info().Msgf("Skipping backup %s as it is not in the range %s ~ %s", oplogBackup.Key, backupRestoreTime, command.Mongo.InputOptions.OplogLimit)
 			default:
 				log.Info().Msgf("Skipping backup %s as it is before %s", oplogBackup.Key, backupRestoreTime)
 
@@ -245,7 +247,7 @@ func (command *DatabaseRestoreCommand) RestoreOplog(ctx context.Context, s3Servi
 		// ###############################
 		// Write the backup to file
 		// ###############################
-		if err := helpers.WriteToFile(obj.Body, downloadsDir, oplogBackup.FileName); err != nil {
+		if err := helpers.WriteToFile(obj.Body, obj.ContentLength, downloadsDir, oplogBackup.FileName); err != nil {
 			return err
 		}
 	}
@@ -301,14 +303,14 @@ func (command *DatabaseRestoreCommand) RestoreOplog(ctx context.Context, s3Servi
 }
 
 func getOplogLimit(command *DatabaseRestoreCommand) (*time.Time, error) {
-	if command.Mongo.OplogLimitTo != "" {
+	if command.Mongo.InputOptions.OplogLimit != "" {
 		log.Info().Msg("Parsing oplog limits")
 	}
 
 	var oplogLimitToTime *time.Time = nil
 
-	if command.Mongo.OplogLimitTo != "" {
-		time, err := time.Parse(helpers.TimeFormat, command.Mongo.OplogLimitTo)
+	if command.Mongo.InputOptions.OplogLimit != "" {
+		time, err := time.Parse(helpers.TimeFormat, command.Mongo.InputOptions.OplogLimit)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to parse provided To Limit")
 			return nil, err

@@ -6,10 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/charmbracelet/bubbles/progress"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rs/zerolog/log"
 )
 
-func WriteToFile(body io.ReadCloser, dir string, fileName string) error {
+func WriteToFile(body io.ReadCloser, contentLength *int64, dir string, fileName string) error {
 	defer body.Close()
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -29,7 +31,25 @@ func WriteToFile(body io.ReadCloser, dir string, fileName string) error {
 
 	defer outFile.Close()
 
-	if _, err := io.Copy(outFile, body); err != nil {
+	pw := &progressWriter{
+		total:  int(*contentLength),
+		file:   outFile,
+		reader: body,
+		onProgress: func(ratio float64) {
+			teaProgram.Send(progressMsg(ratio))
+		},
+	}
+
+	m := model{
+		pw:       pw,
+		progress: progress.New(progress.WithDefaultGradient()),
+	}
+
+	teaProgram = tea.NewProgram(m, tea.WithInput(nil), tea.WithoutSignalHandler())
+
+	go pw.Start()
+
+	if _, err := teaProgram.Run(); err != nil {
 		log.Err(err).Msg("Failed to write backup to file")
 		return err
 	}

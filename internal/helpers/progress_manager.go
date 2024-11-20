@@ -13,12 +13,14 @@ type ProgressManager struct{}
 var stopProgress = make(chan bool)
 
 func (p *ProgressManager) Attach(name string, progressor progress.Progressor) {
+	_, max := progressor.Progress()
+	log.Info().Msgf("starting with %s, total records %d", name, max)
 	go process(name, progressor)
 }
 
 func (p *ProgressManager) Detach(name string) {
 	stopProgress <- true
-	log.Info().Msg(fmt.Sprintf("Progress: %s: done", name))
+	log.Info().Msgf("finished %s", name)
 
 }
 
@@ -29,7 +31,9 @@ func process(name string, progressor progress.Progressor) {
 			return
 		default:
 			current, max := progressor.Progress()
-			log.Info().Msg(fmt.Sprintf("Progress: %s: %d/%d", name, current, max))
+			if current != 0 {
+				log.Info().Msg(fmt.Sprintf("Progress: %s: %d/%d", name, current, max))
+			}
 			time.Sleep(1 * time.Second)
 		}
 	}
