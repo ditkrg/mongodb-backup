@@ -14,13 +14,13 @@ var stopProgress = make(chan bool)
 
 func (p *ProgressManager) Attach(name string, progressor progress.Progressor) {
 	_, max := progressor.Progress()
-	log.Info().Msgf("starting with %s, total records %d", name, max)
+	log.Info().Msgf("dumping %s, total records %d", name, max)
 	go process(name, progressor)
 }
 
 func (p *ProgressManager) Detach(name string) {
 	stopProgress <- true
-	log.Info().Msgf("finished %s", name)
+	log.Info().Msgf("finished dumping %s", name)
 
 }
 

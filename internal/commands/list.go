@@ -15,13 +15,17 @@ import (
 )
 
 type ListCommand struct {
-	S3          flags.S3Flags `embed:"" group:"Common S3 Flags:"`
-	Oplog       bool          `required:"" xor:"list" help:"List oplog backups"`
-	FullBackups bool          `required:"" xor:"list" help:"List full backups"`
-	Database    string        `required:"" xor:"list" help:"List backups for a specific database"`
+	S3          flags.S3Flags        `embed:"" group:"Common S3 Flags:"`
+	Verbosity   flags.VerbosityFlags `embed:"" prefix:"verbosity-" envprefix:"VERBOSITY__" group:"verbosity options"`
+	Oplog       bool                 `required:"" xor:"list" help:"List oplog backups"`
+	FullBackups bool                 `required:"" xor:"list" help:"List full backups"`
+	Database    string               `required:"" xor:"list" help:"List backups for a specific database"`
 }
 
 func (command *ListCommand) Run() error {
+
+	command.Verbosity.SetGlobalLogLevel()
+
 	var resp *s3.ListObjectsV2Output
 	var prefix string
 	var err error

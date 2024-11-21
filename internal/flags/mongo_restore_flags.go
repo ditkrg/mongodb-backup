@@ -4,8 +4,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ditkrg/mongodb-backup/internal/helpers"
-	mongoLog "github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongorestore"
 	"github.com/rs/zerolog/log"
@@ -47,17 +45,10 @@ type MongoRestoreFlags struct {
 		RestoreDBUsersAndRoles bool   `env:"RESTORE_DB_USERS_AND_ROLES" help:"restore user and role definitions for the given database (Default: true)"`
 		SkipUsersAndRoles      bool   `env:"SKIP_USERS_AND_ROLES" help:"Skip restoring users and roles, regardless of namespace, when true (Default: false)"`
 	} `embed:"" group:"restore options"`
-
-	Verbosity VerbosityFlags `embed:"" prefix:"verbosity-" envprefix:"VERBOSITY__" group:"verbosity options"`
 }
 
 func (o *MongoRestoreFlags) PrepareBackupMongoRestoreOptions(filePath string) (*mongorestore.MongoRestore, error) {
 	log.Info().Msg("preparing mongodb restore options")
-
-	mongoLog.SetVerbosity(options.Verbosity{
-		VLevel: o.Verbosity.Level,
-		Quiet:  o.Verbosity.Quiet,
-	})
 
 	inputOptions := &mongorestore.InputOptions{
 		Archive:                filePath,
@@ -106,13 +97,12 @@ func (o *MongoRestoreFlags) PrepareBackupMongoRestoreOptions(filePath string) (*
 		TargetDirectory: o.BackupDir,
 		InputOptions:    inputOptions,
 	})
-	mongorestore.ProgressManager = &helpers.ProgressManager{}
-	mongorestore.SkipUsersAndRoles = o.InputOptions.SkipUsersAndRoles
 
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create mongorestore options")
 		return nil, err
 	}
+	mongorestore.SkipUsersAndRoles = o.InputOptions.SkipUsersAndRoles
 
 	if err := mongorestore.ParseAndValidateOptions(); err != nil {
 		log.Err(err).Msg("Failed to parse and validate options")
@@ -124,11 +114,6 @@ func (o *MongoRestoreFlags) PrepareBackupMongoRestoreOptions(filePath string) (*
 
 func (o *MongoRestoreFlags) PrepareOplogMongoRestoreOptions(backupDir string, to *time.Time) (*mongorestore.MongoRestore, error) {
 	log.Info().Msg("preparing mongodb oplog restore options")
-
-	mongoLog.SetVerbosity(options.Verbosity{
-		VLevel: o.Verbosity.Level,
-		Quiet:  o.Verbosity.Quiet,
-	})
 
 	inputOptions := &mongorestore.InputOptions{
 		Directory: backupDir,
@@ -179,7 +164,6 @@ func (o *MongoRestoreFlags) PrepareOplogMongoRestoreOptions(backupDir string, to
 		TargetDirectory: backupDir,
 		InputOptions:    inputOptions,
 	})
-	mongorestore.ProgressManager = &helpers.ProgressManager{}
 
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create mongorestore options")

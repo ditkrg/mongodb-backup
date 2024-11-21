@@ -1,15 +1,12 @@
 package main
 
 import (
-	"context"
-
 	"github.com/alecthomas/kong"
 	"github.com/ditkrg/mongodb-backup/internal/commands"
-	"github.com/ditkrg/mongodb-backup/internal/options"
+	"github.com/ditkrg/mongodb-backup/internal/helpers"
 	"github.com/joho/godotenv"
-	"github.com/rs/zerolog"
+	mongoLog "github.com/mongodb/mongo-tools/common/log"
 	"github.com/rs/zerolog/log"
-	"github.com/sethvargo/go-envconfig"
 )
 
 type CLI struct {
@@ -27,9 +24,9 @@ func main() {
 	godotenv.Load(".env")
 
 	// #############################
-	// Set global log level
+	// Set global MongoDB log writer
 	// #############################
-	setGlobalLogLevel()
+	mongoLog.SetWriter(&helpers.MongoLogger{})
 
 	// #############################
 	// Prepare CLI
@@ -53,20 +50,4 @@ func main() {
 	if err := ctx.Run(); err != nil {
 		log.Fatal().Err(err).Msg("Failed to run the command")
 	}
-}
-
-func setGlobalLogLevel() {
-	var c options.LogLevel
-	var err error
-	var level zerolog.Level
-
-	if err = envconfig.Process(context.Background(), &c); err != nil {
-		log.Fatal().Err(err).Send()
-	}
-
-	if level, err = c.Parse(); err != nil {
-		log.Fatal().Err(err).Send()
-	}
-
-	zerolog.SetGlobalLevel(level)
 }

@@ -24,11 +24,14 @@ import (
 )
 
 type DumpCommand struct {
-	S3    flags.S3Flags        `embed:"" group:"Common S3 Flags:"`
-	Mongo flags.MongoDumpFlags `embed:"" envprefix:"MONGO_DUMP__" group:"Common Mongo Dump Flags:"`
+	S3        flags.S3Flags        `embed:"" group:"Common S3 Flags:"`
+	Mongo     flags.MongoDumpFlags `embed:"" envprefix:"MONGO_DUMP__" group:"Common Mongo Dump Flags:"`
+	Verbosity flags.VerbosityFlags `embed:"" prefix:"verbosity-" envprefix:"VERBOSITY__" group:"verbosity options"`
 }
 
 func (command DumpCommand) Run() error {
+
+	command.Verbosity.SetGlobalLogLevel()
 
 	if command.Mongo.OutputOptions.OpLog {
 		return startOplogBackup(&command)

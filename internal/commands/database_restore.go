@@ -22,13 +22,14 @@ import (
 )
 
 type DatabaseRestoreCommand struct {
-	Key   string                  `optional:"" prefix:"s3-" help:"The key of the backup to restore."`
-	S3    flags.S3Flags           `embed:"" group:"S3 Flags:"`
-	K8s   flags.K8sFlags          `embed:"" group:"kubernetes Flags:"`
-	Mongo flags.MongoRestoreFlags `embed:"" envprefix:"MONGO_RESTORE__"`
+	Key       string                  `optional:"" prefix:"s3-" help:"The key of the backup to restore."`
+	S3        flags.S3Flags           `embed:"" group:"S3 Flags:"`
+	Mongo     flags.MongoRestoreFlags `embed:"" envprefix:"MONGO_RESTORE__"`
+	Verbosity flags.VerbosityFlags    `embed:"" prefix:"verbosity-" envprefix:"VERBOSITY__" group:"verbosity options"`
 }
 
 func (command DatabaseRestoreCommand) Run() error {
+	command.Verbosity.SetGlobalLogLevel()
 
 	ctx := context.Background()
 	s3Service := services.NewS3Service(command.S3)

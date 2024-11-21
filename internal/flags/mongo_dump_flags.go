@@ -9,8 +9,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongodump"
 	"github.com/rs/zerolog/log"
-
-	mongoLog "github.com/mongodb/mongo-tools/common/log"
 )
 
 type MongoDumpFlags struct {
@@ -38,17 +36,11 @@ type MongoDumpFlags struct {
 		NumParallelCollections     int      `env:"NUM_PARALLEL_COLLECTIONS" default:"1" help:"The number of collections to dump in parallel"`
 	} `embed:"" group:"output options"`
 
-	KeepRecentN int            `env:"KEEP_RECENT_N" default:"10" help:"The number of collections to dump in parallel"`
-	Verbosity   VerbosityFlags `embed:"" prefix:"verbosity-" envprefix:"VERBOSITY__"`
+	KeepRecentN int `env:"KEEP_RECENT_N" default:"10" help:"The number of collections to dump in parallel"`
 }
 
 func (o *MongoDumpFlags) PrepareMongoDump() (*mongodump.MongoDump, error) {
 	log.Info().Msg("Preparing mongodump")
-
-	mongoLog.SetVerbosity(options.Verbosity{
-		VLevel: o.Verbosity.Level,
-		Quiet:  o.Verbosity.Quiet,
-	})
 
 	o.BackupDir = strings.TrimSuffix(o.BackupDir, "/")
 

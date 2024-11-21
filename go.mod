@@ -14,7 +14,6 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/mongodb/mongo-tools v0.0.0-20240802142803-70f1e402fe5e
 	github.com/rs/zerolog v1.33.0
-	github.com/sethvargo/go-envconfig v1.1.0
 	k8s.io/client-go v0.31.2
 )
 
