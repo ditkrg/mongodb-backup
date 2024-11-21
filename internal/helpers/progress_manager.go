@@ -20,8 +20,6 @@ func (p *ProgressManager) Attach(name string, progressor progress.Progressor) {
 
 func (p *ProgressManager) Detach(name string) {
 	stopProgress <- true
-	log.Info().Msgf("finished dumping %s", name)
-
 }
 
 func process(name string, progressor progress.Progressor) {
