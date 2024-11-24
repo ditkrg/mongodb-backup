@@ -99,7 +99,7 @@ main dump --s3-endpoint=STRING --s3-access-key=STRING --s3-secret-key=STRING --s
 
 **Output Options**:
 - `--gzip/--no-gzip ($MONGO_DUMP__GZIP)`: Compress the backup with gzip.
-- `--oplog ($MONGO_DUMP__OPLOG)`: Include oplog in the backup.
+- `--oplog ($MONGO_DUMP__OPLOG)`: Take an oplog backup instead of database backup.
 - `--dump-db-users-and-roles ($MONGO_DUMP__DUMP_DB_USERS_AND_ROLES)`: Dump the users and roles in the databas
 - `--skip-users-and-roles ($MONGO_DUMP__SKIP_USERS_AND_ROLES)`: Skip dumping the users and roles in the database
 - `--excluded-collections=COLLECTIONS,... ($MONGO_DUMP__EXCLUDED_COLLECTIONS)`: (Optional) Collections to exclude from the backup.
