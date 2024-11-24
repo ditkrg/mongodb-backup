@@ -10,7 +10,7 @@ import (
 )
 
 type MongoRestoreFlags struct {
-	ConnectionString string `required:"" env:"CONNECTION_STRING" help:"The connection to the MongoDB instance to restore to" group:"uri options"`
+	ConnectionString string `required:"" env:"CONNECTION_STRING" help:"The connection to the MongoDB instance to restore to"`
 	BackupDir        string `required:"" env:"BACKUP_DIR" help:"The directory to download the backup to and restore from"`
 
 	NamespaceOptions struct {
@@ -21,20 +21,20 @@ type MongoRestoreFlags struct {
 	} `embed:"" group:"namespace options"`
 
 	RestoreOptions struct {
-		Drop                     bool   `env:"DROP" help:"Drop each collection before import (Default: false)"`
-		DryRun                   bool   `env:"DRY_RUN" help:"Run the restore in 'dry run' mode (Default: false)"`
+		Drop                     bool   `env:"DROP" help:"Drop each collection before import"`
+		DryRun                   bool   `env:"DRY_RUN" help:"Run the restore in 'dry run' mode"`
 		WriteConcern             string `env:"WRITE_CONCERN" default:"majority" help:"Write concern for the restore operation"`
-		NoIndexRestore           bool   `env:"NO_INDEX_RESTORE" help:"Don't restore indexes (Default: false)"`
-		ConvertLegacyIndexes     bool   `env:"CONVERT_LEGACY_INDEXES" help:"Removes invalid index options and rewrites legacy option values (e.g. true becomes 1) (Default: false)"`
-		NoOptionsRestore         bool   `env:"NO_OPTIONS_RESTORE" help:"Don't restore collection options (Default: false)"`
+		NoIndexRestore           bool   `env:"NO_INDEX_RESTORE" help:"Don't restore indexes"`
+		ConvertLegacyIndexes     bool   `env:"CONVERT_LEGACY_INDEXES" help:"Removes invalid index options and rewrites legacy option values (e.g. true becomes 1)"`
+		NoOptionsRestore         bool   `env:"NO_OPTIONS_RESTORE" help:"Don't restore collection options"`
 		KeepIndexVersion         bool   `env:"KEEP_INDEX_VERSION" negatable:"" default:"true" help:"Don't upgrade indexes to latest version (Default: true)"`
-		MaintainInsertionOrder   bool   `env:"MAINTAIN_INSERTION_ORDER" help:"restore the documents in the order of their appearance in the input source. By default the insertions will be performed in an arbitrary order. Setting this flag also enables the behavior of stopOnError and restricts NumInsertionWorkersPerCollection to 1. (Default: false)"`
+		MaintainInsertionOrder   bool   `env:"MAINTAIN_INSERTION_ORDER" help:"restore the documents in the order of their appearance in the input source. By default the insertions will be performed in an arbitrary order. Setting this flag also enables the behavior of stopOnError and restricts NumInsertionWorkersPerCollection to 1."`
 		NumParallelCollections   int    `env:"NUM_PARALLEL_COLLECTIONS" default:"1" help:"Number of collections to restore in parallel"`
 		NumInsertionWorkers      int    `env:"NUM_INSERTION_WORKERS" default:"1" help:"Number of insert operations to run concurrently per collection"`
-		StopOnError              bool   `env:"STOP_ON_ERROR" help:"Stop restoring at first error rather than continuing (Default: false)"`
-		BypassDocumentValidation bool   `env:"BYPASS_DOCUMENT_VALIDATION" help:"Bypass document validation (Default: false)"`
-		PreserveUUID             bool   `env:"PRESERVE_UUID" help:"preserve original collection UUIDs (requires drop) (Default: false)"`
-		FixDottedHashedIndexes   bool   `env:"FIX_DOTTED_HASHED_INDEXES" help:"when enabled, all the hashed indexes on dotted fields will be created as single field ascending indexes on the destination (Default: false)"`
+		StopOnError              bool   `env:"STOP_ON_ERROR" help:"Stop restoring at first error rather than continuing"`
+		BypassDocumentValidation bool   `env:"BYPASS_DOCUMENT_VALIDATION" help:"Bypass document validation"`
+		PreserveUUID             bool   `env:"PRESERVE_UUID" help:"preserve original collection UUIDs (requires drop)"`
+		FixDottedHashedIndexes   bool   `env:"FIX_DOTTED_HASHED_INDEXES" help:"when enabled, all the hashed indexes on dotted fields will be created as single field ascending indexes on the destination"`
 	} `embed:"" group:"restore options"`
 
 	InputOptions struct {
@@ -43,7 +43,7 @@ type MongoRestoreFlags struct {
 		OplogLimit             string `env:"OPLOG_LIMIT_TO" help:"The End time of the OpLog restore."`
 		Gzip                   bool   `env:"GZIP" negatable:"" default:"true" help:"Whether the backup is gzipped (Default: true)"`
 		RestoreDBUsersAndRoles bool   `env:"RESTORE_DB_USERS_AND_ROLES" help:"restore user and role definitions for the given database (Default: true)"`
-		SkipUsersAndRoles      bool   `env:"SKIP_USERS_AND_ROLES" help:"Skip restoring users and roles, regardless of namespace, when true (Default: false)"`
+		SkipUsersAndRoles      bool   `env:"SKIP_USERS_AND_ROLES" help:"Skip restoring users and roles, regardless of namespace, when true"`
 	} `embed:"" group:"restore options"`
 }
 

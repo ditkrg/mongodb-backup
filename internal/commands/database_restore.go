@@ -22,7 +22,7 @@ import (
 )
 
 type DatabaseRestoreCommand struct {
-	Key       string                  `optional:"" prefix:"s3-" help:"The key of the backup to restore."`
+	Key       string                  `optional:"" env:"S3__KEY" prefix:"s3-" help:"The key of the backup to restore."`
 	S3        flags.S3Flags           `embed:"" group:"S3 Flags:"`
 	Mongo     flags.MongoRestoreFlags `embed:"" envprefix:"MONGO_RESTORE__"`
 	Verbosity flags.VerbosityFlags    `embed:"" prefix:"verbosity-" envprefix:"VERBOSITY__" group:"verbosity options"`
