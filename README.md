@@ -166,7 +166,52 @@ mongodb-backup restore --s3-endpoint=STRING --s3-access-key=STRING --s3-secret-k
 
 ---
 
-## Special Note: Oplog Restore Requirements
+## 📋 Notes
+
+### Dump Requirements
+
+To successfully perform a `dump` operation using this CLI tool, ensure the MongoDB user has the necessary permissions. The following roles and privileges are recommended:
+
+ - The user must have the `backup` role or equivalent permissions on all databases, including the `admin` database. This allows the user to:
+   - Read data from all collections.
+   - Access system collections required for metadata.
+
+ Example command to create a user with the required permissions:
+ ```bash
+ db.createUser({
+     user: "<username>",
+     pwd: "<password>",
+     roles: [
+         { role: "backup", db: "admin" }
+     ]
+ })
+ ```
+
+Failing to configure these permissions may result in errors or incomplete backups. Always validate user roles before performing a `dump` operation.
+
+### Restore Requirements
+
+To successfully perform a `restore` operation using this CLI tool, ensure the MongoDB user has the necessary permissions. The following roles and privileges are recommended:
+
+- The user must have `restore` privileges on all databases, including the `admin` database, to:
+ - Create collections.
+ - Insert documents.
+ - Restore indexes, users, and roles.
+
+Example command to create a user with the required permissions:
+```bash
+db.createUser({
+   user: "<username>",
+   pwd: "<password>",
+   roles: [
+       { role: "restore", db: "admin" }
+   ]
+})
+```
+
+Failing to configure these permissions may result in incomplete or unsuccessful restores. Always validate user roles before performing a `restore` operation.
+
+### Oplog Restore Requirements
 
 To perform an oplog restore, the user must have a specific role with the following privileges:
 
@@ -194,6 +239,7 @@ db.adminCommand({
   ]
 })
 ```
+
 ---
 
 ## Examples
@@ -213,6 +259,34 @@ db.adminCommand({
    ```bash
    mongodb-backup restore --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --connection-string mongodb://localhost:27017
    ```
+
+---
+
+### ⚠️ Warning: User and Role Restoration Behavior
+
+When working with MongoDB backups and restores, specific behaviors related to users and roles must be noted. Below are the findings based on multiple test scenarios conducted using both this CLI tool and `mongodump`/`mongorestore`:
+
+1. **Full Backup and Restore**:
+   - Performing a full backup of the cluster includes both the user and role definitions (typically stored in the `admin` database) along with the data.
+   - **Full Restore**:
+     - If you choose not to restore users and roles, the restoration excludes them as expected.
+     - If you choose to restore users and roles, they are restored correctly.
+
+2. **Partial Restore from a Full Backup**:
+   - When restoring a single database from a full backup:
+     - **Without Users and Roles**: The restore works as expected, with only the selected database being restored without users and roles.
+     - **With Users and Roles**: Only the data for the selected database is restored; users and roles are not restored unless the `admin` database is also included in the restore.
+       - **Important**: Including the `admin` database in the restore will restore all users and roles across the cluster, including users from other databases, which may not be desirable.
+
+3. **Single Database Backup and Restore**:
+   - Taking a backup of a single database does not include the user and role definitions from the `admin` database.
+   - **Restoration Behavior**:
+     - A single database restore will only include the database data and no users or roles.
+
+#### Recommendations:
+- For scenarios where user and role definitions are critical, always include the `admin` database in your backup and restore operations.
+- When restoring a single database with users and roles, ensure you have a clear strategy to avoid unintentionally restoring users from other databases.
+- If users and roles for a specific database are needed, consider creating and managing them separately to avoid relying solely on the database restore process.
 
 ---
 
