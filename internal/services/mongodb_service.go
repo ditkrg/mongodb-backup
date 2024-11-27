@@ -83,6 +83,8 @@ func (m *MongodbService) RemoveUserRoles(ctx context.Context, usersToSkip []stri
 			return result.Err()
 		}
 
+		log.Info().Msgf("Roles removed for user %s", user.Id)
+
 	}
 
 	// ############################

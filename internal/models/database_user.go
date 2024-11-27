@@ -9,11 +9,11 @@ import (
 const UserOriginalRoles = "userOriginalRoles"
 
 type User struct {
-	Id         string                 `bson:"_id"`
-	Database   string                 `bson:"db"`
-	UserName   string                 `bson:"user"`
-	Roles      []Role                 `bson:"roles"`
-	CustomData map[string]interface{} `bson:"customData,omitempty"`
+	Id         string                   `bson:"_id"`
+	Database   string                   `bson:"db"`
+	UserName   string                   `bson:"user"`
+	Roles      []map[string]interface{} `bson:"roles"`
+	CustomData map[string]interface{}   `bson:"customData,omitempty"`
 }
 
 func (user *User) PrepareRemoveUserRolesCommand() *UpdateUserCommand {
@@ -31,7 +31,7 @@ func (user *User) PrepareRemoveUserRolesCommand() *UpdateUserCommand {
 	// ############################
 	return &UpdateUserCommand{
 		UserName:   user.UserName,
-		Roles:      make([]Role, 0),
+		Roles:      make([]map[string]interface{}, 0),
 		CustomData: user.CustomData,
 	}
 }
@@ -53,7 +53,7 @@ func (user *User) PrepareSetOriginalUserRolesCommand() (*UpdateUserCommand, erro
 		return nil, err
 	}
 
-	var roles []Role
+	var roles []map[string]interface{}
 	err = json.Unmarshal(jsonData, &roles)
 	if err != nil {
 		log.Error().Err(err).Msg("Error unmarshalling json")
