@@ -42,7 +42,7 @@ type MongoRestoreFlags struct {
 		OplogReplay            bool   `env:"OPLOG_REPLAY" negatable:"" default:"true" help:"replay the oplog backups (Default: true)"`
 		OplogLimit             string `env:"OPLOG_LIMIT_TO" help:"The End time of the OpLog restore."`
 		Gzip                   bool   `env:"GZIP" negatable:"" default:"true" help:"Whether the backup is gzipped (Default: true)"`
-		RestoreDBUsersAndRoles bool   `env:"RESTORE_DB_USERS_AND_ROLES" help:"restore user and role definitions for the given database (Default: true)"`
+		RestoreDBUsersAndRoles bool   `env:"RESTORE_DB_USERS_AND_ROLES" help:"restore user and role definitions for the given database"`
 		SkipUsersAndRoles      bool   `env:"SKIP_USERS_AND_ROLES" help:"Skip restoring users and roles, regardless of namespace, when true"`
 	} `embed:"" group:"restore options"`
 }

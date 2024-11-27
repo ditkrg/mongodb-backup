@@ -22,10 +22,11 @@ import (
 )
 
 type DatabaseRestoreCommand struct {
-	Key       string                  `optional:"" env:"S3__KEY" prefix:"s3-" help:"The key of the backup to restore."`
-	S3        flags.S3Flags           `embed:"" group:"S3 Flags:"`
-	Mongo     flags.MongoRestoreFlags `embed:"" envprefix:"MONGO_RESTORE__"`
-	Verbosity flags.VerbosityFlags    `embed:"" prefix:"verbosity-" envprefix:"VERBOSITY__" group:"verbosity options"`
+	Key                string                  `optional:"" env:"S3__KEY" prefix:"s3-" help:"The key of the backup to restore."`
+	UsersToSkipDisable []string                `required:"" env:"USERS_TO_SKIP_DISABLE" help:"List of users to skip disabling, make sure to provide the admin user and the user that will be used to restore the backup."`
+	S3                 flags.S3Flags           `embed:"" group:"S3 Flags:"`
+	Mongo              flags.MongoRestoreFlags `embed:"" envprefix:"MONGO_RESTORE__"`
+	Verbosity          flags.VerbosityFlags    `embed:"" prefix:"verbosity-" envprefix:"VERBOSITY__" group:"verbosity options"`
 }
 
 func (command DatabaseRestoreCommand) Run() error {
@@ -37,6 +38,12 @@ func (command DatabaseRestoreCommand) Run() error {
 	var err error
 	var mongoRestore *mongorestore.MongoRestore
 	var backup *s3.GetObjectOutput
+
+	mongodbService, err := services.NewMongodbService(command.Mongo.ConnectionString, ctx)
+
+	if err != nil {
+		return err
+	}
 
 	backupDir := strings.TrimSuffix(command.Mongo.BackupDir, "/")
 
@@ -67,8 +74,19 @@ func (command DatabaseRestoreCommand) Run() error {
 	log.Info().Msgf("Restoring backup %s", command.Key)
 
 	// ########################
+	// Check if we should Run users restore.
+	// ########################
+	restoreUsersAfterDataRestoreComplete := !command.Mongo.InputOptions.SkipUsersAndRoles
+
+	// ########################
+	// Disable users
+	// ########################
+	mongodbService.RemoveUserRoles(ctx, command.UsersToSkipDisable)
+
+	// ########################
 	// Prepare restore options
 	// ########################
+	command.Mongo.InputOptions.SkipUsersAndRoles = true
 	if mongoRestore, err = command.Mongo.PrepareBackupMongoRestoreOptions(filepath.Join(backupDir, fileName)); err != nil {
 		log.Err(err).Msg("Failed to prepare restore options")
 		return err
@@ -86,14 +104,43 @@ func (command DatabaseRestoreCommand) Run() error {
 
 	log.Info().Msgf("Successfully restored %d, Failed to restore %d", result.Successes, result.Failures)
 
-	if !command.Mongo.InputOptions.OplogReplay {
-		return nil
+	if command.Mongo.InputOptions.OplogReplay {
+		log.Info().Msg("Restoring Oplog")
+
+		if err := command.RestoreOplog(ctx, s3Service, command.Key); err != nil {
+			log.Err(err).Msg("Failed to restore oplog")
+			return err
+		}
 	}
 
-	log.Info().Msg("Restoring Oplog")
+	if restoreUsersAfterDataRestoreComplete {
+		// ########################
+		// Restore users
+		// ########################
+		log.Info().Msg("Restoring users")
 
-	if err := command.RestoreOplog(ctx, s3Service, command.Key); err != nil {
-		log.Err(err).Msg("Failed to restore oplog")
+		// ########################
+		// Prepare restore options
+		// ########################
+		command.Mongo.InputOptions.SkipUsersAndRoles = false
+		command.Mongo.NamespaceOptions.NSInclude = []string{"admin.*"}
+		if mongoRestore, err = command.Mongo.PrepareBackupMongoRestoreOptions(filepath.Join(backupDir, fileName)); err != nil {
+			log.Err(err).Msg("Failed to prepare restore user options")
+			return err
+		}
+
+		// ########################
+		// Restore backup
+		// ########################
+		result := mongoRestore.Restore()
+
+		if result.Err != nil {
+			log.Err(result.Err).Msg("Failed to restore backup")
+			return result.Err
+		}
+	}
+
+	if err := mongodbService.SetOriginalUserRoles(ctx, command.UsersToSkipDisable); err != nil {
 		return err
 	}
 
