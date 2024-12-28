@@ -105,11 +105,17 @@ func (command DatabaseRestoreCommand) Run() error {
 	log.Info().Msgf("Successfully restored %d, Failed to restore %d", result.Successes, result.Failures)
 
 	if command.Mongo.InputOptions.OplogReplay {
-		log.Info().Msg("Restoring Oplog")
+		if command.Mongo.NamespaceOptions.Database == "" && command.Mongo.NamespaceOptions.Collection == "" &&
+			len(command.Mongo.NamespaceOptions.NSExclude) == 0 && len(command.Mongo.NamespaceOptions.NSInclude) == 0 {
 
-		if err := command.RestoreOplog(ctx, s3Service, command.Key); err != nil {
-			log.Err(err).Msg("Failed to restore oplog")
-			return err
+			log.Info().Msg("Restoring Oplog")
+
+			if err := command.RestoreOplog(ctx, s3Service, command.Key); err != nil {
+				log.Err(err).Msg("Failed to restore oplog")
+				return err
+			}
+		} else {
+			log.Info().Msg("Skipping Oplog restore as database or collection is provided")
 		}
 	}
 
