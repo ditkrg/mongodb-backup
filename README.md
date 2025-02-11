@@ -139,6 +139,7 @@ mongodb-backup restore --s3-endpoint=STRING --s3-access-key=STRING --s3-secret-k
 - `--ns-exclude=EXCLUDES,... ($MONGO_RESTORE__NS_EXCLUDE)`: Namespaces to exclude.
 
 **Restore Options**:
+- `--users-to-skip-disable ($USERS_TO_SKIP_DISABLE)` List of users to skip disabling, make sure to provide the admin user and the user that will be used to restore the backup, it has to the ***users ID*** ( it is usually in the following format `database.username`), you can get the users ID by running the following command in the MongoDB shell: `db.getUsers()`
 - `--drop ($MONGO_RESTORE__DROP)`: Drop each collection before import
 - `--dry-run ($MONGO_RESTORE__DRY_RUN)`: Run the restore in `dry run` mode
 - `--write-concern="majority ($MONGO_RESTORE__WRITE_CONCERN `: Write concern for the restore operation
