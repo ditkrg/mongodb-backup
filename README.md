@@ -169,35 +169,35 @@ mongodb-backup restore --s3-endpoint=STRING --s3-access-key=STRING --s3-secret-k
 
 ## 📋 Notes
 
-### Dump Requirements
+### Dump
 
 To successfully perform a `dump` operation using this CLI tool, ensure the MongoDB user has the necessary permissions. The following roles and privileges are recommended:
 
- - The user must have the `backup` role or equivalent permissions on all databases, including the `admin` database. This allows the user to:
+- The user must have the `backup` role or equivalent permissions on all databases, including the `admin` database. This allows the user to:
    - Read data from all collections.
    - Access system collections required for metadata.
 
- Example command to create a user with the required permissions:
- ```bash
- db.createUser({
-     user: "<username>",
-     pwd: "<password>",
-     roles: [
-         { role: "backup", db: "admin" }
-     ]
- })
- ```
+Example command to create a user with the required permissions:
+```bash
+db.createUser({
+   user: "<username>",
+   pwd: "<password>",
+   roles: [
+      { role: "backup", db: "admin" }
+   ]
+})
+```
 
 Failing to configure these permissions may result in errors or incomplete backups. Always validate user roles before performing a `dump` operation.
 
-### Restore Requirements
+### Restore
 
 To successfully perform a `restore` operation using this CLI tool, ensure the MongoDB user has the necessary permissions. The following roles and privileges are recommended:
 
 - The user must have `restore` privileges on all databases, including the `admin` database, to:
- - Create collections.
- - Insert documents.
- - Restore indexes, users, and roles.
+  - Create collections.
+  - Insert documents.
+  - Restore indexes, users, and roles.
 
 Example command to create a user with the required permissions:
 ```bash
@@ -212,9 +212,14 @@ db.createUser({
 
 Failing to configure these permissions may result in incomplete or unsuccessful restores. Always validate user roles before performing a `restore` operation.
 
-### Oplog Restore Requirements
+### Oplog Dump
 
-To perform an oplog restore, the user must have a specific role with the following privileges:
+The oplog user must have the same permissions as the backup user above, besides that you can only perform oplog dump if there is a full backup in the S3 bucket.
+
+
+### Oplog Restore
+
+- To perform an oplog restore, the user must have a specific role with the following privileges:
 
 ```json
 {
@@ -225,6 +230,8 @@ To perform an oplog restore, the user must have a specific role with the followi
 You can create this user by running the following commands in the MongoDB shell:
 
 ```bash
+use admin
+
 db.createRole({
   role: "myroot",
   privileges: [{ actions: ["anyAction"], resource: { anyResource: true } }],
@@ -241,6 +248,8 @@ db.adminCommand({
 })
 ```
 
+- oplog restore will automatically run when trying to restore a backup, the Oplog restore will only work if you do a **full backup** restore.
+
 ---
 
 ## Examples
@@ -251,9 +260,9 @@ db.adminCommand({
    mongodb-backup dump --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --connection-string mongodb://localhost:27017
    ```
 
-2. List backups:
+2. List backups (view the full backups):
    ```bash
-   mongodb-backup list --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups
+   mongodb-backup list --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --full-backups
    ```
 
 3. Restore a backup:
@@ -261,6 +270,22 @@ db.adminCommand({
    mongodb-backup restore --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --connection-string mongodb://localhost:27017
    ```
 
+### Oplog Restore
+
+1. Take an oplog backup (there has to be a full backup in the S3 bucket):
+   ```bash
+   mongodb-backup dump --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --connection-string mongodb://localhost:27017 --oplog
+   ```
+
+2. List the backups (view the oplog backups):
+   ```bash
+   mongodb-backup list --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --oplog
+   ```
+
+3. Restore the oplog: after restoring the full backup, the oplog restore will automatically run.
+   ```bash
+   mongodb-backup restore --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --connection-string mongodb://localhost:27017
+   ```
 ---
 
 ### ⚠️ Warning: User and Role Restoration Behavior
