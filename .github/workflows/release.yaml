@@ -1,4 +1,4 @@
-name: Build Image & Helm Chart
+name: Build Image & CLI
 
 on:
   push:
