@@ -1,6 +1,6 @@
 services:
   mongodb-primary:
-    image: bitnami/mongodb:6.0
+    image: bitnami/mongodb:8.0.4
     container_name: mongodb
     hostname: mongodb
     environment:
