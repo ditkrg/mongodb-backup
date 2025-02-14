@@ -31,11 +31,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build
-        run: go build -tags=nomsgpack -v -o mongodb-backup main.go
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Build for Linux (amd64)
+        run: GOOS=linux GOARCH=amd64 go build -tags=nomsgpack -v -o mongodb-backup-linux-amd64 main.go
+
+      - name: Build for Windows (amd64)
+        run: GOOS=windows GOARCH=amd64 go build -tags=nomsgpack -v -o mongodb-backup-windows-amd64.exe main.go
+
+      - name: Build for macOS (Intel)
+        run: GOOS=darwin GOARCH=amd64 go build -tags=nomsgpack -v -o mongodb-backup-darwin-amd64 main.go
+
+      - name: Build for macOS (Apple Silicon)
+        run: GOOS=darwin GOARCH=arm64 go build -tags=nomsgpack -v -o mongodb-backup-darwin-arm64 main.go
 
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          files: mongodb-backup
+          files: |
+            mongodb-backup-linux-amd64
+            mongodb-backup-windows-amd64.exe
+            mongodb-backup-darwin-amd64
+            mongodb-backup-darwin-arm64
 
