@@ -1,16 +1,74 @@
-
 # MongoDB Backup CLI Tool
 
-A Golang-powered CLI tool for managing MongoDB backups with seamless integration to S3. The tool supports various features including taking backups, restoring from S3, listing backups, and handling oplog backups.
+A Golang-powered CLI tool for managing MongoDB backups with seamless integration to S3.
+
+## Table of Contents
+- [MongoDB Backup CLI Tool](#mongodb-backup-cli-tool)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Installation](#installation)
+    - [Option 1: Download Pre-built Binary (Recommended)](#option-1-download-pre-built-binary-recommended)
+    - [Option 2: Build from Source](#option-2-build-from-source)
+  - [Commands and Flags](#commands-and-flags)
+    - [Global Flags](#global-flags)
+    - [Commands](#commands)
+      - [1. **`list`**: List backups](#1-list-list-backups)
+      - [2. **`dump`**: Take a database or point-in-time backup](#2-dump-take-a-database-or-point-in-time-backup)
+      - [3. **`restore`**: Restore a database/point-in-time backup](#3-restore-restore-a-databasepoint-in-time-backup)
+  - [Examples](#examples)
+    - [Basic Usage](#basic-usage)
+    - [Using Environment Variables](#using-environment-variables)
+  - [Permissions](#permissions)
+    - [Backup \& Oplog Backup](#backup--oplog-backup)
+    - [Restore](#restore)
+    - [Oplog Restore](#oplog-restore)
+  - [Troubleshooting](#troubleshooting)
+    - [Getting Help](#getting-help)
+  - [Important Behaviors and Prerequisites](#important-behaviors-and-prerequisites)
+    - [Backup Dependencies](#backup-dependencies)
+    - [Restore Behaviors](#restore-behaviors)
+    - [Backup Retention](#backup-retention)
+  - [⚠️ Warning: User and Role Restoration Behavior](#️-warning-user-and-role-restoration-behavior)
+  - [Contribution](#contribution)
 
 ## Features
-
-- **Backup MongoDB**: Create a complete backup of your MongoDB database and upload it to S3.
-- **Restore from S3**: Download a backup from S3 and restore it locally or to a MongoDB instance.
-- **List Backups**: View all available backups stored in S3, filtered by type or database.
-- **Oplog Backup**: Perform incremental backups using MongoDB's oplog for real-time changes.
+- **Full Database Backup & Restore**: Create complete backups of your MongoDB databases
+- **Oplog Backup & Restore**: Perform point-in-time backups and restores using oplog
+- **S3 Integration**: Seamlessly store and manage backups in S3-compatible storage
+- **Flexible Configuration**: Support for environment variables and command-line flags
+- **Cross-Platform**: Available for Linux, Windows, and macOS (Intel & Apple Silicon)
+- **Docker Support**: Ready-to-use Docker image for containerized environments
 
 ## Installation
+
+### Option 1: Download Pre-built Binary (Recommended)
+
+Download the latest pre-built binary for your platform from our [releases page](https://github.com/ditkrg/mongodb-backup/releases).
+
+1. Choose the appropriate binary for your platform:
+   - Linux: `mongodb-backup-linux-amd64`
+   - Windows: `mongodb-backup-windows-amd64.exe`
+   - macOS Intel: `mongodb-backup-darwin-amd64`
+   - macOS Apple Silicon: `mongodb-backup-darwin-arm64`
+
+2. Make the binary executable (Linux/macOS):
+   ```bash
+   chmod +x mongodb-backup-*
+   ```
+
+3. Add to PATH:
+   - **Linux/macOS**:
+     ```bash
+     sudo mv mongodb-backup-* /usr/local/bin/mongodb-backup
+     ```
+   - **Windows**:
+     - Move the `.exe` file to a directory of your choice
+     - Add that directory to your system's PATH environment variable
+     - Or use the binary directly from the download location
+
+### Option 2: Build from Source
+
+If you prefer to build from source:
 
 1. Clone the repository:
    ```bash
@@ -19,18 +77,45 @@ A Golang-powered CLI tool for managing MongoDB backups with seamless integration
    ```
 
 2. Build the binary:
-   ```bash
-   go build -o mongodb-backup
-   ```
 
-3. Add the binary to your PATH (optional):
-   ```bash
-   sudo mv mongodb-backup /usr/local/bin
-   ```
+   - For Ubuntu/Linux
+     ```bash
+     GOOS=linux GOARCH=amd64 go build -o mongodb-backup
+     ```
+
+   - For Windows
+     ```bash
+     GOOS=windows GOARCH=amd64 go build -o mongodb-backup.exe
+     ```
+
+   - For macOS
+     ```bash
+     # For Intel Macs
+     GOOS=darwin GOARCH=amd64 go build -o mongodb-backup
+
+     # For Apple Silicon Macs
+     GOOS=darwin GOARCH=arm64 go build -o mongodb-backup
+     ```
+
+3. Add the binary to your PATH:
+
+   - For Ubuntu/Linux
+     ```bash
+     sudo mv mongodb-backup /usr/local/bin
+     ```
+
+   - For Windows
+     - Move the `mongodb-backup.exe` to a directory of your choice
+     - Add that directory to your system's PATH environment variable
+     - Or use the binary directly from the build location
+
+   - For macOS
+     ```bash
+     sudo mv mongodb-backup /usr/local/bin
+     ```
+
 
 ## Commands and Flags
-
-This CLI tool supports three primary commands: `list`, `dump`, and `restore`, each with a set of configurable flags to suit various MongoDB backup and restoration needs.
 
 ### Global Flags
 
@@ -61,11 +146,10 @@ mongodb-backup list --s3-endpoint=STRING --s3-access-key=STRING --s3-secret-key=
 - `--s3-bucket=STRING ($S3__BUCKET)`: S3 bucket name.
 - `--s3-prefix=STRING ($S3__PREFIX)`: (Optional) S3 path prefix.
 
-**Verbosity Options**:
+**Verbosity Flags**:
 - `--verbosity-level=1 ($VERBOSITY__LEVEL)`: Log verbosity level (1-3, higher is more verbose).
 - `--verbosity-quiet ($VERBOSITY__QUIET)`: Suppress all log output.
 
----
 
 #### 2. **`dump`**: Take a database or point-in-time backup
 Creates a MongoDB backup and uploads it to S3.
@@ -110,9 +194,8 @@ main dump --s3-endpoint=STRING --s3-access-key=STRING --s3-secret-key=STRING --s
 - `--verbosity-level=1 ($VERBOSITY__LEVEL)`: Log verbosity level (1-3, higher is more verbose).
 - `--verbosity-quiet ($VERBOSITY__QUIET)`: Suppress all log output.
 
----
 
-#### 3. **`restore`**: Restore a database
+#### 3. **`restore`**: Restore a database/point-in-time backup
 Restores a MongoDB database from a backup stored in S3.
 
 **Usage**:
@@ -165,15 +248,112 @@ mongodb-backup restore --s3-endpoint=STRING --s3-access-key=STRING --s3-secret-k
 - `--verbosity-level=1`: Log verbosity level (1-3, higher is more verbose).
 - `--verbosity-quiet`: Suppress all log output.
 
----
 
-## 📋 Notes
+## Examples
 
-### Dump
+### Basic Usage
 
-To successfully perform a `dump` operation using this CLI tool, ensure the MongoDB user has the necessary permissions. The following roles and privileges are recommended:
+1. **List All Backups**
+   ```bash
+   mongodb-backup list \
+     --s3-endpoint="https://s3.example.com" \
+     --s3-access-key="your-access-key" \
+     --s3-secret-key="your-secret-key" \
+     --s3-bucket="your-backups" \
+     --oplog|--full-backups|--database="your-database"
+   ```
 
-- The user must have the `backup` role or equivalent permissions on all databases, including the `admin` database. This allows the user to:
+2. **Create a Full Backup**
+   ```bash
+   mongodb-backup dump \
+     --s3-endpoint="https://s3.example.com" \
+     --s3-access-key="your-access-key" \
+     --s3-secret-key="your-secret-key" \
+     --s3-bucket="your-backups" \
+     --connection-string="mongodb://localhost:27017" \
+   ```
+3. **Create a Database Backup of a specific database**
+   ```bash
+   mongodb-backup dump \
+     --s3-endpoint="https://s3.example.com" \
+     --s3-access-key="your-access-key" \
+     --s3-secret-key="your-secret-key" \
+     --s3-bucket="your-backups" \
+     --connection-string="mongodb://localhost:27017" \
+     --database="mydb"
+   ```
+
+
+4. **Create Oplog Backup** (You need to have a full backup in the S3 bucket first)
+   ```bash
+   mongodb-backup dump \
+     --s3-endpoint="https://s3.example.com" \
+     --s3-access-key="your-access-key" \
+     --s3-secret-key="your-secret-key" \
+     --s3-bucket="your-backups" \
+     --connection-string="mongodb://localhost:27017" \
+     --oplog
+   ```
+
+5. **Restore a Database Backup**
+   ```bash
+   mongodb-backup restore \
+     --s3-endpoint="https://s3.example.com" \
+     --s3-access-key="your-access-key" \
+     --s3-secret-key="your-secret-key" \
+     --s3-bucket="your-backups" \
+     --connection-string="mongodb://localhost:27017" \
+     --s3-key="key-of-the-database-backup"
+   ```
+
+6. **Restore a full backup** (by default it will restore the full backup and then start replaying the oplog from the time of the chosen backup)
+   ```bash
+   mongodb-backup restore \
+     --s3-endpoint="https://s3.example.com" \
+     --s3-access-key="your-access-key" \
+     --s3-secret-key="your-secret-key" \
+     --s3-bucket="your-backups" \
+     --connection-string="mongodb://localhost:27017" \
+     --s3-key="key-of-the-full-backup"
+   ```
+
+7. **Restore specific database from a full backup**
+   ```bash
+   mongodb-backup restore \
+     --s3-endpoint="https://s3.example.com" \
+     --s3-access-key="your-access-key" \
+     --s3-secret-key="your-secret-key" \
+     --s3-bucket="your-backups" \
+     --connection-string="mongodb://localhost:27017" \
+     --database="mydb"|--ns-exclude="mydb.*"
+   ```
+
+### Using Environment Variables
+
+You can use environment variables instead of command-line flags:
+
+```bash
+export S3__ENDPOINT="https://s3.example.com"
+export S3__ACCESS_KEY="your-access-key"
+export S3__SECRET_ACCESS_KEY="your-secret-key"
+export S3__BUCKET="your-backups"
+export MONGO_DUMP__CONNECTION_STRING="mongodb://localhost:27017"
+
+mongodb-backup dump --database="mydb"
+```
+
+or set the environment variables in the `.env` file then run the command:
+
+```bash
+export $(cat .env)
+mongodb-backup dump --database="mydb"
+```
+
+## Permissions
+
+### Backup & Oplog Backup
+
+To successfully perform a `dump` operation using this CLI tool, ensure the MongoDB user has the necessary permissions, the user must have the `backup` role or equivalent permissions on all databases, including the `admin` database. This allows the user to:
    - Read data from all collections.
    - Access system collections required for metadata.
 
@@ -192,9 +372,7 @@ Failing to configure these permissions may result in errors or incomplete backup
 
 ### Restore
 
-To successfully perform a `restore` operation using this CLI tool, ensure the MongoDB user has the necessary permissions. The following roles and privileges are recommended:
-
-- The user must have `restore` privileges on all databases, including the `admin` database, to:
+To successfully perform a `restore` operation using this CLI tool, ensure the MongoDB user has the necessary permissions, the user must have the `restore` role or equivalent permissions on all databases, including the `admin` database. This allows the user to:
   - Create collections.
   - Insert documents.
   - Restore indexes, users, and roles.
@@ -212,14 +390,9 @@ db.createUser({
 
 Failing to configure these permissions may result in incomplete or unsuccessful restores. Always validate user roles before performing a `restore` operation.
 
-### Oplog Dump
-
-The oplog user must have the same permissions as the backup user above, besides that you can only perform oplog dump if there is a full backup in the S3 bucket.
-
 
 ### Oplog Restore
-
-- To perform an oplog restore, the user must have a specific role with the following privileges:
+To perform an oplog restore, the user must have a specific role with the following privileges:
 
 ```json
 {
@@ -227,7 +400,8 @@ The oplog user must have the same permissions as the backup user above, besides 
   "resource": { "anyResource": true }
 }
 ```
-You can create this user by running the following commands in the MongoDB shell:
+
+use can create the role by running the following commands in the MongoDB shell:
 
 ```bash
 use admin
@@ -237,7 +411,10 @@ db.createRole({
   privileges: [{ actions: ["anyAction"], resource: { anyResource: true } }],
   roles: []
 })
+```
+then you can create the user with the role by running the following commands in the MongoDB shell:
 
+```bash
 db.adminCommand({
   createUser: "<Username>",
   pwd: "<Password>",
@@ -248,73 +425,88 @@ db.adminCommand({
 })
 ```
 
-- oplog restore will automatically run when trying to restore a backup, the Oplog restore will only work if you do a **full backup** restore.
+## Troubleshooting
 
----
+### Getting Help
+- Open an issue on GitHub for bug reports
+- Check existing issues for known problems
+- Include logs with `--verbosity-level=3` for better debugging
 
-## Examples
+## Important Behaviors and Prerequisites
 
-### Full Backup Workflow
-1. Take a backup:
-   ```bash
-   mongodb-backup dump --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --connection-string mongodb://localhost:27017
-   ```
+### Backup Dependencies
 
-2. List backups (view the full backups):
-   ```bash
-   mongodb-backup list --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --full-backups
-   ```
+1. **Full Backup**
+   - A full backup is the foundation for all other backup operations
+   - Full backups include all databases, collections, and optionally user/role definitions
+   - Required before taking oplog backups
 
-3. Restore a backup:
-   ```bash
-   mongodb-backup restore --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --connection-string mongodb://localhost:27017
-   ```
+2. **Oplog Backup Requirements**
+   - Must have at least one full backup in the S3 bucket before taking oplog backups
+   - Each oplog backup tracks changes since the last backup Oplog backup, except for the first oplog backup, it will track changes since the full backup
+   - Multiple oplog backups can be taken after a full backup
 
-### Oplog Restore
+### Restore Behaviors
 
-1. Take an oplog backup (there has to be a full backup in the S3 bucket):
-   ```bash
-   mongodb-backup dump --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --connection-string mongodb://localhost:27017 --oplog
-   ```
+1. **Full Backup Restore**
+   - When restoring a full backup, the tool will:
+     - First restore the full backup data
+     - Automatically replay all available oplog entries from the backup time
+     - This provides point-in-time recovery without manual oplog restoration
 
-2. List the backups (view the oplog backups):
-   ```bash
-   mongodb-backup list --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --oplog
-   ```
+2. **Database-Specific Restore**
+   - When restoring a specific database:
+     - Can restore from either a full backup or database-specific backup
+     - If restoring from a full backup, only the specified database is restored
+     - Oplog entries ***will not*** be replayed for the specified database.
 
-3. Restore the oplog: after restoring the full backup, the oplog restore will automatically run.
-   ```bash
-   mongodb-backup restore --s3-endpoint https://mys3.com --s3-access-key MYKEY --s3-secret-key MYSECRET --s3-bucket my-backups --connection-string mongodb://localhost:27017
-   ```
----
+3. **Oplog Restore**
+   - Oplog restore is automatic when restoring a full backup
+   - The tool will:
+     1. Restore the full backup
+     2. Find all oplog backups taken after the full backup
+     3. Apply oplog entries in chronological order
+   - You cannot manually trigger oplog restore; it's part of the full restore process
 
-### ⚠️ Warning: User and Role Restoration Behavior
+### Backup Retention
 
-When working with MongoDB backups and restores, specific behaviors related to users and roles must be noted. Below are the findings based on multiple test scenarios conducted using both this CLI tool and `mongodump`/`mongorestore`:
+1. **Keep Recent N Backups**
+   - Use `--keep-recent-n` to maintain a specific number of backups
+   - Applies separately to:
+     - Full backups
+     - Database-specific backups
+   - Older backups are automatically removed
+
+2. **Backup Chains**
+   - Full backup → Oplog backups form a chain
+   - Deleting a full backup will orphan its oplog backups
+   - Orphaned oplog backups are automatically cleaned up
+
+## ⚠️ Warning: User and Role Restoration Behavior
+
+Understanding MongoDB user and role restoration behavior is critical for maintaining proper security and access control. Here's a comprehensive guide based on extensive testing with this CLI tool and native MongoDB tools:
 
 1. **Full Backup and Restore**:
-   - Performing a full backup of the cluster includes both the user and role definitions (typically stored in the `admin` database) along with the data.
-   - **Full Restore**:
-     - If you choose not to restore users and roles, the restoration excludes them as expected.
-     - If you choose to restore users and roles, they are restored correctly.
+   - **Backup Behavior**:
+     - Full cluster backups automatically include all user and role definitions from the `admin` database
+     - This includes system roles, custom roles, and user credentials across all databases
+   - **Restore Options**:
+     - choosing to skip the restore of users and roles will behave as expected, the users and roles will not be restored.
+     - choosing to restore users and roles will restore all user and role definitions as expected. the user and roles will be restored.
 
-2. **Partial Restore from a Full Backup**:
-   - When restoring a single database from a full backup:
-     - **Without Users and Roles**: The restore works as expected, with only the selected database being restored without users and roles.
-     - **With Users and Roles**: Only the data for the selected database is restored; users and roles are not restored unless the `admin` database is also included in the restore.
-       - **Important**: Including the `admin` database in the restore will restore all users and roles across the cluster, including users from other databases, which may not be desirable.
+2. **Restoring a single database from a full backup**:
+     - **Without users and roles**: Only restores the specified database's data
+     - **With users and roles**: Only restores the specified database's data, the users and roles ***will not*** be restored unless the `admin` database is also included in the restore.
 
-3. **Single Database Backup and Restore**:
-   - Taking a backup of a single database does not include the user and role definitions from the `admin` database.
-   - **Restoration Behavior**:
-     - A single database restore will only include the database data and no users or roles.
+3. **Single Database Operations**:
+   - **Backup**:
+     - Only captures database-specific data
+     - Does NOT include user/role definitions
+     - Cannot be used for user/role migration
+   - **Restore Behavior**:
+     - Restores only data, collections, and indexes
+     - Users and roles can not be restored from a single database backup
 
-#### Recommendations:
-- For scenarios where user and role definitions are critical, always include the `admin` database in your backup and restore operations.
-- When restoring a single database with users and roles, ensure you have a clear strategy to avoid unintentionally restoring users from other databases.
-- If users and roles for a specific database are needed, consider creating and managing them separately to avoid relying solely on the database restore process.
-
----
 
 ## Contribution
 
